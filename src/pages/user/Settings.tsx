@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Moon, Sun, SunMoon, KeyRound, Info } from 'lucide-react'
+import { ChevronLeft, Moon, Sun, SunMoon, KeyRound, Info, Volume2, VolumeX, Vibrate, VibrateOff } from 'lucide-react'
 import { useBank, useToast, useTheme } from '../../store'
 import { Button, Sheet, PinPad, TopBar } from '../../components/ui'
 import type { Theme } from '../../lib/types'
+import { useFx, fxSuccess, buzz } from '../../lib/fx'
 
 export default function Settings() {
   const nav = useNavigate()
@@ -11,6 +12,10 @@ export default function Settings() {
   const theme = useTheme((s) => s.theme)
   const setTheme = useTheme((s) => s.setTheme)
   const changePin = useBank((s) => s.changePin)
+  const sound = useFx((s) => s.sound)
+  const haptics = useFx((s) => s.haptics)
+  const setSound = useFx((s) => s.setSound)
+  const setHaptics = useFx((s) => s.setHaptics)
   const session = useBank((s) => s.session)
   const users = useBank((s) => s.users)
   const me = users.find((u) => u.id === session?.userId)!
@@ -54,6 +59,34 @@ export default function Settings() {
       </div>
 
       <div className="mt-6">
+        <p className="text-[12px] font-bold text-muted uppercase tracking-wide mb-2">Sound &amp; Feedback</p>
+        <div className="card divide-y divide-line overflow-hidden">
+          <ToggleRow
+            icon={sound ? <Volume2 size={19} /> : <VolumeX size={19} />}
+            label="Sounds"
+            sub="Taps, success chimes & alerts"
+            on={sound}
+            onToggle={() => {
+              const next = !sound
+              setSound(next)
+              if (next) setTimeout(() => fxSuccess(), 120)
+            }}
+          />
+          <ToggleRow
+            icon={haptics ? <Vibrate size={19} /> : <VibrateOff size={19} />}
+            label="Vibration"
+            sub="Haptic feedback on taps & alerts"
+            on={haptics}
+            onToggle={() => {
+              const next = !haptics
+              setHaptics(next)
+              if (next) buzz([30, 40, 30])
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="mt-6">
         <p className="text-[12px] font-bold text-muted uppercase tracking-wide mb-2">Security</p>
         <button onClick={() => setPinOpen(true)} className="card p-4 w-full flex items-center gap-3 text-left active:scale-[0.98]">
           <span className="w-10 h-10 rounded-xl bg-primary/12 text-primary flex items-center justify-center">
@@ -88,5 +121,36 @@ export default function Settings() {
         </div>
       </Sheet>
     </div>
+  )
+}
+
+function ToggleRow({
+  icon,
+  label,
+  sub,
+  on,
+  onToggle,
+}: {
+  icon: React.ReactNode
+  label: string
+  sub: string
+  on: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button onClick={onToggle} className="w-full flex items-center gap-3 p-4 text-left active:bg-surface2 transition-colors">
+      <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${on ? 'bg-primary/12 text-primary' : 'bg-surface2 text-faint'}`}>
+        {icon}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-[14px] font-semibold text-text">{label}</span>
+        <span className="block text-[12px] text-muted truncate">{sub}</span>
+      </span>
+      <span className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${on ? 'bg-primary' : 'bg-line'}`}>
+        <span
+          className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${on ? 'left-6' : 'left-1'}`}
+        />
+      </span>
+    </button>
   )
 }

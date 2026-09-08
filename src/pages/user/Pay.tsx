@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, CheckCircle2 } from 'lucide-react'
 import { useBank, useToast } from '../../store'
 import { inrFull } from '../../lib/utils'
 import { Avatar, Button, Sheet, PinPad, TopBar, Modal, inputCls } from '../../components/ui'
+import { fxCoin } from '../../lib/fx'
 
 export default function Pay() {
   const { toId } = useParams()
+  const [sp] = useSearchParams()
   const nav = useNavigate()
   const toast = useToast((s) => s.toast)
   const session = useBank((s) => s.session)
@@ -16,8 +18,8 @@ export default function Pay() {
   const me = users.find((u) => u.id === session?.userId)!
   const to = users.find((u) => u.id === toId)
 
-  const [amount, setAmount] = useState('')
-  const [note, setNote] = useState('')
+  const [amount, setAmount] = useState(sp.get('am') || '')
+  const [note, setNote] = useState(sp.get('tn') || '')
   const [pinOpen, setPinOpen] = useState(false)
   const [done, setDone] = useState<{ amount: number; ref: string } | null>(null)
 
@@ -39,6 +41,7 @@ export default function Pay() {
     const res = await transfer(Number(amount), me.id, to.id, 'upi', note || 'Scan & Pay')
     setPinOpen(false)
     if (res.ok) {
+      fxCoin()
       setDone({ amount: Number(amount), ref: String(Date.now()).slice(-9) })
       setAmount('')
       setNote('')

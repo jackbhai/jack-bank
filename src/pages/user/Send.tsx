@@ -5,6 +5,7 @@ import { useBank, useToast } from '../../store'
 import { inr, inrFull } from '../../lib/utils'
 import { Avatar, Button, Segmented, Sheet, PinPad, TopBar, Modal, inputCls } from '../../components/ui'
 import type { User } from '../../lib/types'
+import { fxCoin } from '../../lib/fx'
 
 export default function Send() {
   const nav = useNavigate()
@@ -44,6 +45,7 @@ export default function Send() {
     const res = await transfer(Number(amount), me.id, selected.id, method === 'account' ? 'account' : 'upi', note || 'Money transfer')
     setPinOpen(false)
     if (res.ok) {
+      fxCoin()
       setDone({ amount: Number(amount), to: selected.name, ref: String(Date.now()).slice(-9) })
       setAmount('')
       setNote('')

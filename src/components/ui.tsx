@@ -5,6 +5,7 @@ import { X, Delete, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { initials } from '../lib/utils'
 import { useToast } from '../store'
+import { fxKey } from '../lib/fx'
 
 /* ---------------- Avatar ---------------- */
 export function Avatar({ name, hue, size = 44 }: { name: string; hue: number; size?: number }) {
@@ -289,7 +290,9 @@ export function PinPad({
           ) : (
             <button
               key={i}
+              data-fx-none
               onClick={() => {
+                fxKey()
                 if (k === 'del') setPin((p) => p.slice(0, -1))
                 else setPin((p) => (p.length < length ? p + k : p))
               }}

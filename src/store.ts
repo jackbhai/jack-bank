@@ -16,6 +16,7 @@ import type {
 } from './lib/types'
 import { DEFAULT_SETTINGS } from './lib/seed'
 import { uid } from './lib/utils'
+import { fxSuccess, fxError, fxTap } from './lib/fx'
 
 export interface Announcement {
   id: string
@@ -720,6 +721,9 @@ export const useToast = create<ToastState>((set) => ({
     const id = uid()
     set((s) => ({ toasts: [...s.toasts, { id, msg, type }] }))
     setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 3200)
+    if (type === 'success') fxSuccess()
+    else if (type === 'error') fxError()
+    else fxTap()
   },
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }))
