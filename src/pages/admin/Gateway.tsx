@@ -14,6 +14,7 @@ type Tab = 'all' | 'pending' | 'paid' | 'refunded' | 'failed'
 const EVENT_LABEL: Record<string, string> = {
   created: 'Order created',
   otp_sent: 'OTP sent',
+  otp_approved: 'OTP approved',
   paid: 'Payment received',
   settled: 'Settled to merchant',
   refunded: 'Refunded',

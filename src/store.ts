@@ -436,6 +436,7 @@ interface BankState {
   gatewayRefund: (orderId: string) => Promise<Res>
   gatewayInitiate: (payToken: string, method: 'upi' | 'card', opts?: { upiId?: string; cardNumber?: string; expiry?: string; cvv?: string }) => Promise<Res & { method?: string; to?: string; expiresIn?: number }>
   gatewayConfirm: (payToken: string, otp: string) => Promise<Res & { amount?: number; merchant?: string; orderRef?: string }>
+  gatewayOtpApprove: (payToken: string) => Promise<Res & { otp?: string; method?: string; to?: string; expiresIn?: number }>
   merchantSetStatus: (merchantId: string, status: 'active' | 'blocked') => Promise<Res>
   merchantRotateKeys: (merchantId: string) => Promise<Res & { apiKey?: string; apiSecret?: string }>
   refreshSkins: () => Promise<void>
@@ -1256,6 +1257,14 @@ export const useBank = create<BankState>()((set, get) => ({
     const j = data as any
     if (!j.ok) return { ok: false, error: j.error }
     return { ok: true, amount: j.amount, merchant: j.merchant, orderRef: j.order_ref }
+  },
+
+  gatewayOtpApprove: async (payToken) => {
+    const { data, error } = await supabase.rpc('jb_gateway_otp_approve', { p_pay_token: payToken })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    return { ok: true, otp: j.otp, method: j.method, to: j.to, expiresIn: j.expires_in }
   },
 
   merchantSetStatus: async (merchantId, status) => {

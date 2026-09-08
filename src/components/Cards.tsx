@@ -6,23 +6,31 @@ import { maskCard } from '../lib/utils'
 /* ---------------- Bank logo (SVG mark) ---------------- */
 export function BankLogo({ size = 34 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-label="Jack Bank">
       <defs>
-        <linearGradient id="jb" x1="0" y1="0" x2="48" y2="48">
-          <stop offset="0" stopColor="var(--primary)" />
-          <stop offset="1" stopColor="var(--accent)" />
+        <linearGradient id="jb-tile" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#8b5cf6" />
+          <stop offset="0.55" stopColor="#6d28d9" />
+          <stop offset="1" stopColor="#22d3ee" />
+        </linearGradient>
+        <linearGradient id="jb-gloss" x1="24" y1="4" x2="24" y2="30" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.34" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <rect x="2" y="2" width="44" height="44" rx="12" fill="url(#jb)" />
-      <path
-        d="M13 16h22l-4.5 16h-13L13 16z"
-        fill="none"
-        stroke="#fff"
-        strokeWidth="2.4"
-        strokeLinejoin="round"
-      />
-      <path d="M19 22h10" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
-      <circle cx="35" cy="13" r="3" fill="#fff" />
+      {/* tile */}
+      <rect x="2" y="2" width="44" height="44" rx="12.5" fill="url(#jb-tile)" />
+      {/* gloss highlight */}
+      <path d="M6 14 C6 9 9.5 6.5 14 6.5 H34 C38.5 6.5 42 9 42 14 V15 A44 44 0 0 1 6 15 Z" fill="url(#jb-gloss)" />
+      {/* inner ring */}
+      <rect x="3.4" y="3.4" width="41.2" height="41.2" rx="11.2" stroke="#ffffff" strokeOpacity="0.16" strokeWidth="1.2" />
+      {/* J */}
+      <path d="M20.5 15 v14 a3 3 0 0 1 -3 3 h-2.5" stroke="#ffffff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M20.5 15 h-3.5" stroke="#ffffff" strokeWidth="4" strokeLinecap="round" />
+      {/* B */}
+      <rect x="22.5" y="14" width="4" height="18" rx="2" fill="#ffffff" />
+      <rect x="26.5" y="14" width="9" height="8.5" rx="4" fill="#ffffff" />
+      <rect x="26.5" y="23.5" width="9" height="8.5" rx="4" fill="#ffffff" />
     </svg>
   )
 }
