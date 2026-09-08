@@ -46,6 +46,18 @@ export function txnMeta(type: TxnType): { label: string; Icon: LucideIcon; cls: 
       return { label: 'FD Booked', Icon: PiggyBank, cls: 'bg-primary/12 text-primary' }
     case 'fd_break':
       return { label: 'FD Broken', Icon: Wallet, cls: 'bg-warning/12 text-warning' }
+    case 'mf_buy':
+      return { label: 'MF Invested', Icon: TrendingUp, cls: 'bg-primary/12 text-primary' }
+    case 'mf_redeem':
+      return { label: 'MF Redeemed', Icon: TrendingUp, cls: 'bg-success/12 text-success' }
+    case 'stock_buy':
+      return { label: 'Stock Bought', Icon: TrendingUp, cls: 'bg-primary/12 text-primary' }
+    case 'stock_sell':
+      return { label: 'Stock Sold', Icon: TrendingUp, cls: 'bg-success/12 text-success' }
+    case 'gateway_pay':
+      return { label: 'Merchant Pay', Icon: Receipt, cls: 'bg-accent/12 text-accent' }
+    case 'skin_buy':
+      return { label: 'Skin Purchase', Icon: BadgePercent, cls: 'bg-primary/12 text-primary' }
     default:
       return { label: 'Transaction', Icon: Receipt, cls: 'bg-surface2 text-muted' }
   }

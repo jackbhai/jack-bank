@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Copy, Check, Share2, Landmark } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { ChevronLeft, Copy, Check, Share2, Landmark, Palette } from 'lucide-react'
 import { useBank, useToast } from '../../store'
 import { QR, MiniCardRow } from '../../components/Cards'
 import { Avatar, Segmented, TopBar, inputCls } from '../../components/ui'
@@ -10,7 +10,11 @@ export default function MyQR() {
   const toast = useToast((s) => s.toast)
   const session = useBank((s) => s.session)
   const users = useBank((s) => s.users)
+  const skins = useBank((s) => s.skins)
+  const userSettings = useBank((s) => s.userSettings)
   const me = users.find((u) => u.id === session?.userId)!
+
+  const qrSkin = skins.find((s) => s.id === (userSettings[me.id] || {}).active_qr_skin)
 
   const [tab, setTab] = useState<'qr' | 'details'>('qr')
   const [amount, setAmount] = useState('')
@@ -54,7 +58,10 @@ export default function MyQR() {
                 <p className="text-[12px] text-muted">{me.upiId}</p>
               </div>
             </div>
-            <QR value={upiString} size={200} />
+            <QR value={upiString} size={200} skin={qrSkin ? { bg: qrSkin.meta?.bg, fg: qrSkin.meta?.fg } : null} />
+            <Link to="/skins" className="flex items-center gap-1.5 text-[12px] font-semibold text-primary">
+              <Palette size={14} /> {qrSkin ? `${qrSkin.name} skin · change` : 'Change QR skin'}
+            </Link>
             <p className="text-[12px] text-muted text-center">Scan with any Jack Bank app to pay instantly</p>
           </div>
 

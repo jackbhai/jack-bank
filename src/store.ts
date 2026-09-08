@@ -16,6 +16,7 @@ import type {
   Res,
   Session,
   Settings,
+  Skin,
   Stock,
   StockHolding,
   StockOrder,
@@ -24,6 +25,7 @@ import type {
   Transaction,
   User,
 } from './lib/types'
+import { applyThemeSkin } from './lib/skins'
 import { DEFAULT_SETTINGS } from './lib/seed'
 import { uid } from './lib/utils'
 import { fxSuccess, fxError, fxTap } from './lib/fx'
@@ -80,6 +82,15 @@ const mapCard = (c: any): Card => ({
   creditLimit: c.credit_limit == null ? undefined : num(c.credit_limit),
   dueAmount: c.due_amount == null ? undefined : num(c.due_amount),
   dueDate: c.due_date ?? undefined,
+})
+
+const mapSkin = (s: any): Skin => ({
+  id: s.id,
+  kind: s.kind,
+  name: s.name,
+  price: num(s.price ?? 0),
+  meta: s.meta ?? {},
+  sort: s.sort ?? 0,
 })
 
 const mapFd = (f: any): FD => ({
@@ -216,7 +227,7 @@ const mapStock = (s: any): Stock => ({
   pe: num(s.pe),
   high52w: num(s.high_52w),
   low52w: num(s.low_52w),
-  history: Array.isArray(s.history) ? s.history.map((p: any) => ({ t: Number(p.t), p: num(p.p) })) : [],
+  history: Array.isArray(s.history) ? s.history.map((p: any) => ({ t: Number(p.t) * 1000, p: num(p.p) })) : [],
 })
 
 const mapStockOrder = (o: any): StockOrder => ({
@@ -347,6 +358,8 @@ interface BankState {
   kyc: KycDoc | null
   userSettings: Record<string, Record<string, any>>
   pricesUpdatedAt: number
+  skins: Skin[]
+  ownedSkins: string[]
 
   init: () => Promise<void>
   login: (email: string, password: string) => Promise<Res & { role?: string }>
@@ -357,9 +370,9 @@ interface BankState {
   stopRealtime: () => void
   startRealtime: () => void
 
-  transfer: (amount: number, fromUserId: string, toUserId: string, method: 'upi' | 'account', note?: string) => Promise<Res>
+  transfer: (amount: number, fromUserId: string, toUserId: string, method: 'upi' | 'account', note?: string, source?: 'balance' | 'card') => Promise<Res>
   requestMoney: (fromUserId: string, toUserId: string, amount: number, note?: string) => Promise<Res>
-  respondMoneyRequest: (reqId: string, action: 'pay' | 'decline') => Promise<Res>
+  respondMoneyRequest: (reqId: string, action: 'pay' | 'decline', source?: 'balance' | 'card') => Promise<Res>
   addMoneyRequest: (userId: string, amount: number, note?: string) => Promise<Res>
   withdrawRequest: (userId: string, amount: number, note?: string) => Promise<Res>
   applyLoan: (userId: string, amount: number, months: number, purpose: string) => Promise<Res>
@@ -382,20 +395,24 @@ interface BankState {
   resetBank: () => Promise<void>
 
   submitKyc: (userId: string, fields: { pan: string; dob: string; gender: string; occupation: string; incomeBand: string; address: string; city: string; state: string; pincode: string; nomineeName: string; nomineeRelation: string }) => Promise<Res>
-  mfBuy: (userId: string, fundId: string, amount: number) => Promise<Res>
+  mfBuy: (userId: string, fundId: string, amount: number, source?: 'balance' | 'card') => Promise<Res>
   mfRedeem: (userId: string, fundId: string, units: number) => Promise<Res>
   mfSetupSip: (userId: string, fundId: string, amount: number, day: number) => Promise<Res>
   mfCancelSip: (userId: string, fundId: string) => Promise<Res>
   mfNavTick: () => Promise<Res>
-  stockPlaceOrder: (userId: string, stockId: string, side: 'buy' | 'sell', type: 'market' | 'limit', qty: number, limitPrice?: number) => Promise<Res>
+  stockPlaceOrder: (userId: string, stockId: string, side: 'buy' | 'sell', type: 'market' | 'limit', qty: number, limitPrice?: number, source?: 'balance' | 'card') => Promise<Res>
   stockCancelOrder: (userId: string, orderId: string) => Promise<Res>
   marketTick: () => Promise<Res>
   registerMerchant: (name: string, app: string, callback: string) => Promise<Res & { merchant?: Merchant }>
-  gatewayPay: (payToken: string, userId: string) => Promise<Res>
+  gatewayPay: (payToken: string, userId: string, source?: 'balance' | 'card') => Promise<Res>
   gatewayGetOrder: (payToken: string) => Promise<Res & { order?: any }>
   gatewayCreateOrder: (apiKey: string, apiSecret: string, orderRef: string, amount: number, note: string) => Promise<Res & { order?: any }>
   gatewayVerify: (apiKey: string, apiSecret: string, orderRef: string) => Promise<Res & { order?: any }>
   gatewaySettle: (merchantId: string) => Promise<Res>
+  refreshSkins: () => Promise<void>
+  buySkin: (skinId: string) => Promise<Res>
+  equipSkin: (skinId: string) => Promise<Res>
+  refreshHome: () => Promise<void>
   getUserSettings: (userId: string) => Promise<Record<string, any>>
   setUserSetting: (userId: string, key: string, value: any) => Promise<Res>
   adminResetPin: (userId: string, pin: string) => Promise<Res>
@@ -450,6 +467,8 @@ export const useBank = create<BankState>()((set, get) => ({
   kyc: null,
   userSettings: {},
   pricesUpdatedAt: 0,
+  skins: [],
+  ownedSkins: [],
 
   /* ---------------- loaders ---------------- */
   refreshUsers: async () => {
@@ -638,6 +657,44 @@ export const useBank = create<BankState>()((set, get) => ({
     set({ kyc: data ? mapKyc(data) : null })
   },
 
+  refreshSkins: async () => {
+    const s = get()
+    if (!s.session) return
+    const [catalog, owned] = await Promise.all([
+      supabase.from('jb_skins').select('*').order('sort'),
+      supabase.from('jb_user_skins').select('skin_id').eq('user_id', s.session.userId),
+    ])
+    if (catalog.data) set({ skins: catalog.data.map(mapSkin) })
+    if (owned.data) set({ ownedSkins: owned.data.map((o) => o.skin_id) })
+  },
+
+  refreshHome: async () => {
+    await Promise.all([get().refreshUsers(), get().refreshTxns(), get().refreshNotifs(), get().refreshAnnouncements(), get().refreshCards()])
+  },
+
+  buySkin: async (skinId) => {
+    const { data, error } = await supabase.rpc('jb_buy_skin', { p_skin: skinId })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await Promise.all([get().refreshSkins(), get().refreshUsers(), get().refreshTxns()])
+    return { ok: true }
+  },
+
+  equipSkin: async (skinId) => {
+    const { data, error } = await supabase.rpc('jb_equip_skin', { p_skin: skinId })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    const skin = get().skins.find((k) => k.id === skinId)
+    if (skin?.kind === 'theme') applyThemeSkin(skin.meta || {})
+    const s = get().session
+    if (s) {
+      set((st) => ({ userSettings: { ...st.userSettings, [s.userId]: { ...(st.userSettings[s.userId] || {}), [skin?.kind === 'qr' ? 'active_qr_skin' : 'active_theme_skin']: skinId } } }))
+    }
+    return { ok: true }
+  },
+
   init: async () => {
     // public directory for login screen
     try {
@@ -658,7 +715,8 @@ export const useBank = create<BankState>()((set, get) => ({
     supabase.auth.onAuthStateChange((_e, sess) => {
       if (!sess && get().session) {
         get().stopRealtime()
-        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0 })
+        applyThemeSkin(null)
+        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0, skins: [], ownedSkins: [] })
       }
     })
     set({ booting: false })
@@ -706,7 +764,8 @@ export const useBank = create<BankState>()((set, get) => ({
   logout: async () => {
     await supabase.auth.signOut()
     get().stopRealtime()
-    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0 })
+    applyThemeSkin(null)
+    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0, skins: [], ownedSkins: [] })
   },
 
   loadAll: async () => {
@@ -718,8 +777,17 @@ export const useBank = create<BankState>()((set, get) => ({
       s.refreshUsers(), s.refreshTxns(), s.refreshLoans(), s.refreshRequests(),
       s.refreshMoneyRequests(), s.refreshNotifs(), s.refreshAnnouncements(),
     ])
-    await Promise.all([s.refreshCards(), s.refreshFds(), s.refreshMarket(), s.refreshKyc(), s.refreshGateway()])
+    await Promise.all([s.refreshCards(), s.refreshFds(), s.refreshMarket(), s.refreshKyc(), s.refreshGateway(), s.refreshSkins()])
     await s.refreshUsers()
+    // apply equipped colour theme (if any)
+    try {
+      const cfg = await s.getUserSettings(s.session.userId)
+      const themeId = cfg.active_theme_skin
+      const skin = get().skins.find((k) => k.id === themeId && k.kind === 'theme')
+      applyThemeSkin(skin ? skin.meta || {} : null)
+    } catch {
+      applyThemeSkin(null)
+    }
     set({ ready: true })
     get().startRealtime()
   },
@@ -767,18 +835,19 @@ export const useBank = create<BankState>()((set, get) => ({
   },
 
   /* ---------------- actions ---------------- */
-  transfer: async (amount, fromUserId, toUserId, method, note) => {
+  transfer: async (amount, fromUserId, toUserId, method, note, source = 'balance') => {
     const { data, error } = await supabase.rpc('jb_transfer_money', {
       p_from: fromUserId,
       p_to: toUserId,
       p_amount: amount,
       p_note: note || null,
       p_method: method,
+      p_source: source,
     })
     if (error) return { ok: false, error: error.message }
     const j = data as any
     if (!j.ok) return { ok: false, error: j.error }
-    await Promise.all([get().refreshTxns(), get().refreshUsers()])
+    await Promise.all([get().refreshTxns(), get().refreshUsers(), get().refreshCards()])
     return { ok: true }
   },
 
@@ -791,12 +860,12 @@ export const useBank = create<BankState>()((set, get) => ({
     return { ok: true }
   },
 
-  respondMoneyRequest: async (reqId, action) => {
-    const { data, error } = await supabase.rpc('jb_respond_money_request', { p_req: reqId, p_action: action })
+  respondMoneyRequest: async (reqId, action, source = 'balance') => {
+    const { data, error } = await supabase.rpc('jb_respond_money_request', { p_req: reqId, p_action: action, p_source: source })
     if (error) return { ok: false, error: error.message }
     const j = data as any
     if (!j.ok) return { ok: false, error: j.error }
-    await Promise.all([get().refreshMoneyRequests(), get().refreshTxns(), get().refreshUsers()])
+    await Promise.all([get().refreshMoneyRequests(), get().refreshTxns(), get().refreshUsers(), get().refreshCards()])
     return { ok: true }
   },
 
@@ -1000,12 +1069,12 @@ export const useBank = create<BankState>()((set, get) => ({
   },
 
   /* ---------------- Mutual funds ---------------- */
-  mfBuy: async (userId, fundId, amount) => {
-    const { data, error } = await supabase.rpc('jb_mf_buy', { p_user: userId, p_fund: fundId, p_amount: amount })
+  mfBuy: async (userId, fundId, amount, source = 'balance') => {
+    const { data, error } = await supabase.rpc('jb_mf_buy', { p_user: userId, p_fund: fundId, p_amount: amount, p_source: source })
     if (error) return { ok: false, error: error.message }
     const j = data as any
     if (!j.ok) return { ok: false, error: j.error }
-    await Promise.all([get().refreshMarket(), get().refreshTxns(), get().refreshUsers()])
+    await Promise.all([get().refreshMarket(), get().refreshTxns(), get().refreshUsers(), get().refreshCards()])
     return { ok: true }
   },
   mfRedeem: async (userId, fundId, units) => {
@@ -1042,14 +1111,14 @@ export const useBank = create<BankState>()((set, get) => ({
   },
 
   /* ---------------- Stock market ---------------- */
-  stockPlaceOrder: async (userId, stockId, side, type, qty, limitPrice) => {
+  stockPlaceOrder: async (userId, stockId, side, type, qty, limitPrice, source = 'balance') => {
     const { data, error } = await supabase.rpc('jb_stock_place_order', {
-      p_user: userId, p_stock: stockId, p_side: side, p_type: type, p_qty: qty, p_limit_price: limitPrice || null,
+      p_user: userId, p_stock: stockId, p_side: side, p_type: type, p_qty: qty, p_limit_price: limitPrice || null, p_source: source,
     })
     if (error) return { ok: false, error: error.message }
     const j = data as any
     if (!j.ok) return { ok: false, error: j.error }
-    await Promise.all([get().refreshMarket(), get().refreshTxns(), get().refreshUsers()])
+    await Promise.all([get().refreshMarket(), get().refreshTxns(), get().refreshUsers(), get().refreshCards()])
     return { ok: true }
   },
   stockCancelOrder: async (userId, orderId) => {
@@ -1078,12 +1147,12 @@ export const useBank = create<BankState>()((set, get) => ({
     await get().refreshGateway()
     return { ok: true, merchant: j.merchant as Merchant }
   },
-  gatewayPay: async (payToken, userId) => {
-    const { data, error } = await supabase.rpc('jb_gateway_pay', { p_pay_token: payToken, p_user: userId })
+  gatewayPay: async (payToken, userId, source = 'balance') => {
+    const { data, error } = await supabase.rpc('jb_gateway_pay', { p_pay_token: payToken, p_user: userId, p_source: source })
     if (error) return { ok: false, error: error.message }
     const j = data as any
     if (!j.ok) return { ok: false, error: j.error }
-    await Promise.all([get().refreshGateway(), get().refreshTxns(), get().refreshUsers()])
+    await Promise.all([get().refreshGateway(), get().refreshTxns(), get().refreshUsers(), get().refreshCards()])
     return { ok: true, ...j }
   },
   gatewayGetOrder: async (payToken) => {

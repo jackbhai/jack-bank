@@ -6,6 +6,7 @@ import { inr, inrCompact, inrPrice } from '../../lib/utils'
 import { pct, upDown } from '../../lib/market'
 import type { MfFund, MfHolding } from '../../lib/types'
 import { Button, Field, Sheet, TopBar, inputCls } from '../../components/ui'
+import { PaySourceSelector, type PaySource } from '../../components/Pay'
 
 const catColor: Record<string, string> = {
   equity: 'bg-primary/12 text-primary',
@@ -39,6 +40,7 @@ export default function MutualFunds() {
   const [units, setUnits] = useState('')
   const [sipAmt, setSipAmt] = useState('')
   const [sipDay, setSipDay] = useState(5)
+  const [source, setSource] = useState<PaySource>('balance')
 
   const invested = myHoldings.reduce((a, h) => a + h.invested, 0)
   const current = myHoldings.reduce((a, h) => {
@@ -61,9 +63,12 @@ export default function MutualFunds() {
     setSipOpen(true)
   }
 
+  const creditCard = me.cards.find((c) => c.type === 'credit' && c.status === 'active')
+  const cardAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
+
   const doBuy = async () => {
     if (!selected) return
-    const res = await mfBuy(me.id, selected.id, Number(amount))
+    const res = await mfBuy(me.id, selected.id, Number(amount), source)
     toast(res.ok ? 'Units allotted at current NAV' : res.error || 'Failed', res.ok ? 'success' : 'error')
     if (res.ok) setBuyOpen(false)
   }
@@ -240,11 +245,23 @@ export default function MutualFunds() {
                 You'll get approx <span className="font-bold text-text">{estUnits}</span> units at NAV {inrPrice(selected.nav)}
               </div>
             )}
-            <div className="flex items-center gap-1.5 text-[11.5px] text-muted">
-              <ShieldCheck size={13} className="text-success" /> SEBI-registered (simulated) · balance {inr(me.balance)}
+            <div className="card p-3.5">
+              <p className="text-[12px] font-semibold text-muted uppercase tracking-wide mb-2">Pay using</p>
+              <PaySourceSelector
+                source={source}
+                onChange={setSource}
+                balance={me.balance}
+                hasCard={!!creditCard}
+                cardAvailable={cardAvailable}
+                cardLimit={creditCard?.creditLimit}
+              />
             </div>
-            <Button full disabled={!amount || Number(amount) < selected.minLumpsum || Number(amount) > me.balance} onClick={doBuy}>
-              Confirm · {amount ? inr(Number(amount)) : ''}
+            <Button
+              full
+              disabled={!amount || Number(amount) < selected.minLumpsum || (source === 'balance' ? Number(amount) > me.balance : Number(amount) > cardAvailable)}
+              onClick={doBuy}
+            >
+              Confirm · {amount ? inr(Number(amount)) : ''}{source === 'card' ? ' · Credit Card' : ''}
             </Button>
           </div>
         )}

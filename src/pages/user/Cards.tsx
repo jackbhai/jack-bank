@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Snowflake, Flame, Eye, EyeOff, ShoppingBag, Wallet, Plus, Lock } from 'lucide-react'
+import { ChevronLeft, Snowflake, Flame, Eye, EyeOff, Wallet, Plus, Lock, ReceiptText } from 'lucide-react'
 import { useBank, useToast } from '../../store'
-import { inr, inrFull } from '../../lib/utils'
+import { inr, inrFull, fmtDateTime } from '../../lib/utils'
 import { DebitCard, CreditCard } from '../../components/Cards'
-import { Button, Segmented, Sheet, TopBar, inputCls } from '../../components/ui'
+import { Button, Segmented, Sheet, TopBar, inputCls, RefreshButton } from '../../components/ui'
+import { txnMeta } from '../../components/Txn'
 import type { Card } from '../../lib/types'
 
 export default function Cards() {
@@ -12,10 +13,13 @@ export default function Cards() {
   const toast = useToast((s) => s.toast)
   const session = useBank((s) => s.session)
   const users = useBank((s) => s.users)
+  const transactions = useBank((s) => s.transactions)
   const setCardStatus = useBank((s) => s.setCardStatus)
-  const creditCardSpend = useBank((s) => s.creditCardSpend)
   const payCardBill = useBank((s) => s.payCardBill)
   const requestCard = useBank((s) => s.requestCard)
+  const refreshCards = useBank((s) => s.refreshCards)
+  const refreshTxns = useBank((s) => s.refreshTxns)
+  const refreshUsers = useBank((s) => s.refreshUsers)
 
   const me = users.find((u) => u.id === session?.userId)!
   const debit = me.cards.filter((c) => c.type === 'debit')
@@ -23,16 +27,32 @@ export default function Cards() {
 
   const [tab, setTab] = useState<'debit' | 'credit'>('debit')
   const [showNum, setShowNum] = useState(false)
-  const [spendOpen, setSpendOpen] = useState(false)
   const [billOpen, setBillOpen] = useState(false)
-  const [spendAmt, setSpendAmt] = useState('')
   const [billAmt, setBillAmt] = useState('')
   const [reqOpen, setReqOpen] = useState(false)
   const [reqType, setReqType] = useState<'debit' | 'credit'>('credit')
   const [reqLimit, setReqLimit] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
 
   const list = tab === 'debit' ? debit : credit
   const active = list[0]
+
+  const due = active?.dueAmount || 0
+  const limit = active?.creditLimit || 0
+  const available = Math.max(0, limit - due)
+  const minDue = due > 0 ? Math.max(Math.round(due * 0.05), 100) : 0
+  const usedPct = limit > 0 ? Math.min(100, Math.round((due / limit) * 100)) : 0
+
+  const statement = useMemo(
+    () => transactions.filter((t) => t.method === 'card' && t.fromUserId === me.id).slice(0, 30),
+    [transactions, me.id],
+  )
+
+  const refresh = async () => {
+    setRefreshing(true)
+    await Promise.all([refreshCards(), refreshTxns(), refreshUsers()])
+    setRefreshing(false)
+  }
 
   const statusBadge = (c: Card) =>
     c.status === 'active' ? (
@@ -45,7 +65,11 @@ export default function Cards() {
 
   return (
     <div className="pt-3">
-      <TopBar title="Cards" left={<button onClick={() => nav(-1)} className="p-1.5 -ml-1.5"><ChevronLeft size={22} /></button>} />
+      <TopBar
+        title="Cards"
+        left={<button onClick={() => nav(-1)} className="p-1.5 -ml-1.5"><ChevronLeft size={22} /></button>}
+        right={<RefreshButton onClick={refresh} refreshing={refreshing} />}
+      />
 
       <div className="mt-2">
         <Segmented
@@ -97,28 +121,78 @@ export default function Cards() {
               </div>
 
               {tab === 'credit' && (
-                <div className="card p-4 space-y-3">
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-muted">Credit limit</span>
-                    <span className="font-semibold text-text">{inr(active.creditLimit || 0)}</span>
+                <>
+                  <div className="card p-4 space-y-3">
+                    <div className="flex justify-between text-[13px]">
+                      <span className="text-muted">Credit limit</span>
+                      <span className="font-semibold text-text">{inr(limit)}</span>
+                    </div>
+                    <div className="flex justify-between text-[13px]">
+                      <span className="text-muted">Available credit</span>
+                      <span className="font-semibold text-success">{inr(available)}</span>
+                    </div>
+                    <div className="flex justify-between text-[13px]">
+                      <span className="text-muted">Outstanding</span>
+                      <span className="font-semibold text-text">{inr(due)}</span>
+                    </div>
+                    <div className="flex justify-between text-[13px]">
+                      <span className="text-muted">Minimum due</span>
+                      <span className="font-semibold text-warning">{due > 0 ? inr(minDue) : '—'}</span>
+                    </div>
+                    <div className="flex justify-between text-[13px]">
+                      <span className="text-muted">Due date</span>
+                      <span className="font-semibold text-text">{active.dueDate || '—'}</span>
+                    </div>
+                    <div className="pt-1">
+                      <div className="flex justify-between text-[11px] text-muted mb-1">
+                        <span>Credit used</span>
+                        <span>{usedPct}%</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-surface2 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${usedPct > 80 ? 'bg-danger' : usedPct > 50 ? 'bg-warning' : 'bg-success'}`}
+                          style={{ width: `${usedPct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <Button variant="ghost" onClick={() => setBillOpen(true)} disabled={due <= 0}>
+                        <Wallet size={16} /> Pay bill
+                      </Button>
+                      <Button onClick={() => setBillOpen(true)} disabled={due <= 0}>
+                        <ReceiptText size={16} /> Statement
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-muted">Current due</span>
-                    <span className="font-semibold text-text">{inr(active.dueAmount || 0)}</span>
+
+                  <div className="card p-4">
+                    <p className="text-[12px] font-semibold text-muted uppercase tracking-wide mb-2">Card statement</p>
+                    {statement.length === 0 ? (
+                      <p className="text-[13px] text-muted py-3 text-center">No card activity yet. Use your credit card to pay anyone or buy stocks.</p>
+                    ) : (
+                      <div className="flex flex-col">
+                        {statement.map((t) => {
+                          const isPay = t.type === 'card_payment'
+                          const meta = txnMeta(t.type)
+                          return (
+                            <div key={t.id} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
+                              <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${meta.cls}`}>
+                                <meta.Icon size={17} />
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13px] font-semibold text-text truncate">{t.note || meta.label}</p>
+                                <p className="text-[11px] text-muted">{fmtDateTime(t.createdAt)} · {meta.label}</p>
+                              </div>
+                              <span className={`text-[13px] font-bold ${isPay ? 'text-success' : 'text-danger'}`}>
+                                {isPay ? '+' : '−'}{inr(t.amount)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-muted">Due date</span>
-                    <span className="font-semibold text-text">{active.dueDate || '—'}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <Button variant="ghost" onClick={() => setSpendOpen(true)}>
-                      <ShoppingBag size={16} /> Simulate spend
-                    </Button>
-                    <Button onClick={() => setBillOpen(true)} disabled={(active.dueAmount || 0) <= 0}>
-                      <Wallet size={16} /> Pay bill
-                    </Button>
-                  </div>
-                </div>
+                </>
               )}
 
               {active.status === 'active' || active.status === 'frozen' ? (
@@ -150,43 +224,14 @@ export default function Cards() {
         </>
       )}
 
-      {/* spend sheet */}
-      <Sheet open={spendOpen} onClose={() => setSpendOpen(false)} title="Simulate Card Spend">
-        <div className="pt-2 flex flex-col gap-3">
-          <p className="text-[13px] text-muted">This adds to your credit card due amount (as if you swiped your card).</p>
-          <input
-            type="number"
-            inputMode="numeric"
-            autoFocus
-            value={spendAmt}
-            onChange={(e) => setSpendAmt(e.target.value)}
-            placeholder="Amount"
-            className={inputCls}
-          />
-          <Button
-            full
-            disabled={!spendAmt || Number(spendAmt) <= 0}
-            onClick={async () => {
-              const res = await creditCardSpend(me.id, Number(spendAmt), 'Card spend (simulated)')
-              toast(res.ok ? 'Spend added to your card dues' : res.error || 'Failed', res.ok ? 'success' : 'error')
-              if (res.ok) {
-                setSpendOpen(false)
-                setSpendAmt('')
-              }
-            }}
-          >
-            Add spend {spendAmt && Number(spendAmt) > 0 ? inrFull(Number(spendAmt)) : ''}
-          </Button>
-        </div>
-      </Sheet>
-
       {/* bill sheet */}
       <Sheet open={billOpen} onClose={() => setBillOpen(false)} title="Pay Credit Card Bill">
-        <div className="pt-2 flex flex-col gap-3">
-          <p className="text-[13px] text-muted">
-            Current due: <span className="font-semibold text-text">{inr(active?.dueAmount || 0)}</span> · Balance:{' '}
-            <span className="font-semibold text-text">{inr(me.balance)}</span>
-          </p>
+        <div className="pt-2 flex flex-col gap-3 pb-2">
+          <div className="card p-3.5 space-y-1.5 text-[12.5px]">
+            <div className="flex justify-between"><span className="text-muted">Outstanding</span><span className="font-semibold text-text">{inr(due)}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Minimum due</span><span className="font-semibold text-warning">{due > 0 ? inr(minDue) : '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Your balance</span><span className="font-semibold text-text">{inr(me.balance)}</span></div>
+          </div>
           <input
             type="number"
             inputMode="numeric"
@@ -196,12 +241,14 @@ export default function Cards() {
             placeholder="Amount to pay"
             className={inputCls}
           />
-          <Button
-            variant="ghost"
-            onClick={() => setBillAmt(String(active?.dueAmount || 0))}
-          >
-            Pay full due
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="ghost" onClick={() => setBillAmt(String(due))}>
+              Pay full due
+            </Button>
+            <Button variant="ghost" onClick={() => setBillAmt(String(minDue))} disabled={minDue <= 0}>
+              Pay minimum
+            </Button>
+          </div>
           <Button
             full
             disabled={!billAmt || Number(billAmt) <= 0}
@@ -211,6 +258,7 @@ export default function Cards() {
               if (res.ok) {
                 setBillOpen(false)
                 setBillAmt('')
+                await refresh()
               }
             }}
           >
@@ -221,7 +269,7 @@ export default function Cards() {
 
       {/* request card sheet */}
       <Sheet open={reqOpen} onClose={() => setReqOpen(false)} title="Request a Card">
-        <div className="pt-2 flex flex-col gap-3">
+        <div className="pt-2 flex flex-col gap-3 pb-2">
           <Segmented
             options={[
               { id: 'credit', label: 'Credit Card' },

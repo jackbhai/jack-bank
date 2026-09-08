@@ -4,6 +4,16 @@ export type UserStatus = 'active' | 'blocked'
 export type CardType = 'debit' | 'credit'
 export type CardNetwork = 'Visa' | 'Mastercard' | 'RuPay'
 export type CardStatus = 'active' | 'frozen' | 'blocked' | 'pending'
+export type SkinKind = 'qr' | 'theme'
+
+export interface Skin {
+  id: string
+  kind: SkinKind
+  name: string
+  price: number
+  meta: Record<string, any>
+  sort: number
+}
 
 export interface Card {
   id: string
@@ -58,6 +68,7 @@ export type TxnType =
   | 'emi' | 'card_spend' | 'card_payment' | 'loan_disbursal'
   | 'adjustment' | 'interest' | 'welcome' | 'fd_open' | 'fd_break'
   | 'mf_buy' | 'mf_redeem' | 'stock_buy' | 'stock_sell' | 'gateway_pay'
+  | 'skin_buy'
 
 export interface Transaction {
   id: string

@@ -5,6 +5,7 @@ import { useBank, useToast } from '../../store'
 import { inrFull } from '../../lib/utils'
 import { BankLogo } from '../../components/Cards'
 import { Button, Sheet, PinPad } from '../../components/ui'
+import { PaySourceSelector, type PaySource } from '../../components/Pay'
 import { fxCoin } from '../../lib/fx'
 
 export default function GatewayPay() {
@@ -20,9 +21,12 @@ export default function GatewayPay() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pinOpen, setPinOpen] = useState(false)
+  const [source, setSource] = useState<PaySource>('balance')
   const [done, setDone] = useState(false)
 
   const me = session ? users.find((u) => u.id === session.userId) : undefined
+  const creditCard = me?.cards.find((c) => c.type === 'credit' && c.status === 'active')
+  const cardAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
 
   useEffect(() => {
     if (!token) return
@@ -41,7 +45,7 @@ export default function GatewayPay() {
       toast('Incorrect PIN', 'error')
       return
     }
-    const res = await gatewayPay(token!, me.id)
+    const res = await gatewayPay(token!, me.id, source)
     setPinOpen(false)
     if (res.ok) {
       fxCoin()
@@ -111,13 +115,33 @@ export default function GatewayPay() {
         ) : !session ? (
           <Button full onClick={() => nav('/login')}>Sign in to pay</Button>
         ) : (
-          <Button full disabled={!me || me.balance < order.amount} onClick={() => setPinOpen(true)}>
-            <Lock size={16} /> Pay {inrFull(order.amount)}
-          </Button>
+          <>
+            <div className="card p-3.5">
+              <p className="text-[12px] font-semibold text-muted uppercase tracking-wide mb-2">Pay using</p>
+              <PaySourceSelector
+                source={source}
+                onChange={setSource}
+                balance={me?.balance || 0}
+                hasCard={!!creditCard}
+                cardAvailable={cardAvailable}
+                cardLimit={creditCard?.creditLimit}
+              />
+            </div>
+            <Button
+              full
+              disabled={!me || (source === 'balance' ? me.balance < order.amount : cardAvailable < order.amount)}
+              onClick={() => setPinOpen(true)}
+            >
+              <Lock size={16} /> Pay {inrFull(order.amount)}{source === 'card' ? ' · Credit Card' : ''}
+            </Button>
+          </>
         )}
 
-        {session && me && me.balance < order.amount && (
+        {session && me && source === 'balance' && me.balance < order.amount && (
           <p className="text-center text-[12.5px] text-danger">Insufficient balance ({inrFull(me.balance)})</p>
+        )}
+        {session && me && source === 'card' && cardAvailable < order.amount && (
+          <p className="text-center text-[12.5px] text-danger">Insufficient credit available ({inrFull(cardAvailable)})</p>
         )}
 
         <div className="mt-auto pt-4 flex items-center justify-center gap-1.5 text-[11px] text-faint">

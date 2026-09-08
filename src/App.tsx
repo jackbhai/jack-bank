@@ -26,6 +26,7 @@ const Settings = lazy(() => import('./pages/user/Settings'))
 const Notifications = lazy(() => import('./pages/user/Notifications'))
 const MutualFunds = lazy(() => import('./pages/user/MutualFunds'))
 const Stocks = lazy(() => import('./pages/user/Stocks'))
+const Skins = lazy(() => import('./pages/user/Skins'))
 const GatewayPay = lazy(() => import('./pages/user/GatewayPay'))
 const AdminDash = lazy(() => import('./pages/admin/Dashboard'))
 const AdminApprovals = lazy(() => import('./pages/admin/Approvals'))
@@ -107,6 +108,7 @@ export default function App() {
             <Route path="fd" element={<FD />} />
             <Route path="mf" element={<MutualFunds />} />
             <Route path="stocks" element={<Stocks />} />
+            <Route path="skins" element={<Skins />} />
             <Route path="settings" element={<Settings />} />
             <Route path="notifications" element={<Notifications />} />
           </Route>

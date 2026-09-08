@@ -4,7 +4,7 @@ import { ChevronLeft, Landmark, Sparkles, CheckCircle2, XCircle, Clock } from 'l
 import { useBank, useToast } from '../../store'
 import { emiMonthly, inr, loanEligibility } from '../../lib/utils'
 import { DEFAULT_SETTINGS } from '../../lib/seed'
-import { Button, Field, Sheet, TopBar, inputCls } from '../../components/ui'
+import { Button, Field, Sheet, TopBar, inputCls, RefreshButton } from '../../components/ui'
 
 export default function Loans() {
   const nav = useNavigate()
@@ -16,6 +16,9 @@ export default function Loans() {
   const settings = useBank((s) => s.settings) || DEFAULT_SETTINGS
   const applyLoan = useBank((s) => s.applyLoan)
   const repayLoan = useBank((s) => s.repayLoan)
+  const refreshLoans = useBank((s) => s.refreshLoans)
+  const refreshTxns = useBank((s) => s.refreshTxns)
+  const refreshUsers = useBank((s) => s.refreshUsers)
 
   const me = users.find((u) => u.id === session?.userId)!
   const eligible = loanEligibility(me.id, users, transactions, loans, settings)
@@ -25,6 +28,13 @@ export default function Loans() {
   const [amount, setAmount] = useState('')
   const [months, setMonths] = useState(12)
   const [purpose, setPurpose] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+
+  const doRefresh = async () => {
+    setRefreshing(true)
+    await Promise.all([refreshLoans(), refreshTxns(), refreshUsers()])
+    setRefreshing(false)
+  }
 
   const estEmi = useMemo(
     () => (amount && Number(amount) > 0 ? emiMonthly(Number(amount), settings.loanInterestRate, months) : 0),
@@ -44,7 +54,11 @@ export default function Loans() {
 
   return (
     <div className="pt-3">
-      <TopBar title="Loans" left={<button onClick={() => nav(-1)} className="p-1.5 -ml-1.5"><ChevronLeft size={22} /></button>} />
+      <TopBar
+        title="Loans"
+        left={<button onClick={() => nav(-1)} className="p-1.5 -ml-1.5"><ChevronLeft size={22} /></button>}
+        right={<RefreshButton onClick={doRefresh} refreshing={refreshing} />}
+      />
 
       <div className="mt-2 card p-5 relative overflow-hidden">
         <div className="absolute -top-10 -right-10 w-36 h-36 rounded-full bg-primary/15" />

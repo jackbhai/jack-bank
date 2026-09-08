@@ -4,7 +4,7 @@ import { ChevronLeft, PiggyBank, TrendingUp, Unlock, CalendarClock } from 'lucid
 import { useBank, useToast } from '../../store'
 import { fmtDate, inr } from '../../lib/utils'
 import { DEFAULT_SETTINGS } from '../../lib/seed'
-import { Button, Field, Modal, Sheet, TopBar, inputCls } from '../../components/ui'
+import { Button, Field, Modal, Sheet, TopBar, inputCls, RefreshButton } from '../../components/ui'
 
 export default function FD() {
   const nav = useNavigate()
@@ -14,6 +14,8 @@ export default function FD() {
   const settings = useBank((s) => s.settings) || DEFAULT_SETTINGS
   const openFD = useBank((s) => s.openFD)
   const breakFD = useBank((s) => s.breakFD)
+  const refreshFds = useBank((s) => s.refreshFds)
+  const refreshUsers = useBank((s) => s.refreshUsers)
 
   const me = users.find((u) => u.id === session?.userId)!
   const fds = me.fds.filter((f) => f.status !== 'broken').sort((a, b) => b.createdAt - a.createdAt)
@@ -22,12 +24,23 @@ export default function FD() {
   const [amount, setAmount] = useState('')
   const [months, setMonths] = useState(12)
   const [breakId, setBreakId] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const doRefresh = async () => {
+    setRefreshing(true)
+    await Promise.all([refreshFds(), refreshUsers()])
+    setRefreshing(false)
+  }
 
   const maturity = (amt: number, m: number) => amt * (1 + (settings.fdInterestRate / 100) * (m / 12))
 
   return (
     <div className="pt-3">
-      <TopBar title="Fixed Deposit" left={<button onClick={() => nav(-1)} className="p-1.5 -ml-1.5"><ChevronLeft size={22} /></button>} />
+      <TopBar
+        title="Fixed Deposit"
+        left={<button onClick={() => nav(-1)} className="p-1.5 -ml-1.5"><ChevronLeft size={22} /></button>}
+        right={<RefreshButton onClick={doRefresh} refreshing={refreshing} />}
+      />
 
       <div className="mt-2 card p-5 relative overflow-hidden">
         <div className="absolute -top-10 -right-10 w-36 h-36 rounded-full bg-warning/15" />

@@ -80,6 +80,8 @@ export type ChartRange = 'Live' | '1D' | '1W' | '1M' | '1Y'
 
 export function chartSeries(symbol: string, range: ChartRange, price: number, live: { t: number; p: number }[]): { t: number; p: number }[] {
   if (range === 'Live') return live.length ? live.slice(-60) : [{ t: Date.now(), p: price }]
+  // 1D uses the real minute-by-minute ticks (pg_cron) when available
+  if (range === '1D' && live.length >= 20) return live.slice(-90)
   const cfg: Record<string, { n: number; vol: number }> = {
     '1D': { n: 24, vol: 0.012 },
     '1W': { n: 48, vol: 0.02 },

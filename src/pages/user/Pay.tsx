@@ -4,6 +4,7 @@ import { ChevronLeft, CheckCircle2 } from 'lucide-react'
 import { useBank, useToast } from '../../store'
 import { inrFull } from '../../lib/utils'
 import { Avatar, Button, Sheet, PinPad, TopBar, Modal, inputCls } from '../../components/ui'
+import { PaySourceSelector, type PaySource } from '../../components/Pay'
 import { fxCoin } from '../../lib/fx'
 
 export default function Pay() {
@@ -21,7 +22,11 @@ export default function Pay() {
   const [amount, setAmount] = useState(sp.get('am') || '')
   const [note, setNote] = useState(sp.get('tn') || '')
   const [pinOpen, setPinOpen] = useState(false)
+  const [source, setSource] = useState<PaySource>('balance')
   const [done, setDone] = useState<{ amount: number; ref: string } | null>(null)
+
+  const creditCard = me.cards.find((c) => c.type === 'credit' && c.status === 'active')
+  const cardAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
 
   if (!to) {
     return (
@@ -38,7 +43,7 @@ export default function Pay() {
       toast('Incorrect PIN', 'error')
       return
     }
-    const res = await transfer(Number(amount), me.id, to.id, 'upi', note || 'Scan & Pay')
+    const res = await transfer(Number(amount), me.id, to.id, 'upi', note || 'Scan & Pay', source)
     setPinOpen(false)
     if (res.ok) {
       fxCoin()
@@ -91,9 +96,21 @@ export default function Pay() {
         <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note (optional)" className={inputCls} />
       </div>
 
+      <div className="mt-4 card p-3.5">
+        <p className="text-[12px] font-semibold text-muted uppercase tracking-wide mb-2">Pay using</p>
+        <PaySourceSelector
+          source={source}
+          onChange={setSource}
+          balance={me.balance}
+          hasCard={!!creditCard}
+          cardAvailable={cardAvailable}
+          cardLimit={creditCard?.creditLimit}
+        />
+      </div>
+
       <div className="mt-5">
         <Button full disabled={!amount || Number(amount) <= 0} onClick={() => setPinOpen(true)}>
-          Pay {amount && Number(amount) > 0 ? inrFull(Number(amount)) : ''}
+          Pay {amount && Number(amount) > 0 ? inrFull(Number(amount)) : ''}{source === 'card' ? ' · Credit Card' : ''}
         </Button>
       </div>
 

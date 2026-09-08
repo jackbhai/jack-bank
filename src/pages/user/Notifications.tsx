@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Bell, BellOff } from 'lucide-react'
 import { useBank } from '../../store'
 import { fmtDateTime } from '../../lib/utils'
-import { Empty, TopBar } from '../../components/ui'
+import { Empty, TopBar, RefreshButton } from '../../components/ui'
 
 export default function Notifications() {
   const nav = useNavigate()
@@ -11,9 +11,17 @@ export default function Notifications() {
   const users = useBank((s) => s.users)
   const notifs = useBank((s) => s.notifications)
   const markNotifsRead = useBank((s) => s.markNotifsRead)
+  const refreshNotifs = useBank((s) => s.refreshNotifs)
+  const [refreshing, setRefreshing] = useState(false)
 
   const me = users.find((u) => u.id === session?.userId)!
   const mine = notifs.filter((n) => n.userId === me.id).sort((a, b) => b.createdAt - a.createdAt)
+
+  const doRefresh = async () => {
+    setRefreshing(true)
+    await refreshNotifs()
+    setRefreshing(false)
+  }
 
   useEffect(() => {
     markNotifsRead(me.id)
@@ -22,7 +30,11 @@ export default function Notifications() {
 
   return (
     <div className="pt-3">
-      <TopBar title="Notifications" left={<button onClick={() => nav(-1)} className="p-1.5 -ml-1.5"><ChevronLeft size={22} /></button>} />
+      <TopBar
+        title="Notifications"
+        left={<button onClick={() => nav(-1)} className="p-1.5 -ml-1.5"><ChevronLeft size={22} /></button>}
+        right={<RefreshButton onClick={doRefresh} refreshing={refreshing} />}
+      />
 
       <div className="mt-3 flex flex-col gap-2">
         {mine.length === 0 && <Empty icon={BellOff} title="No notifications" sub="You're all caught up" />}

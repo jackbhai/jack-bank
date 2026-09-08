@@ -153,19 +153,21 @@ export function CreditCard({ card }: { card: Card }) {
 }
 
 /* ---------------- QR code ---------------- */
-export function QR({ value, size = 190, withLogo = true }: { value: string; size?: number; withLogo?: boolean }) {
+export function QR({ value, size = 190, withLogo = true, skin }: { value: string; size?: number; withLogo?: boolean; skin?: { bg?: string[]; fg?: string } | null }) {
   const [url, setUrl] = useState('')
+  const fg = skin?.fg || '#000000'
   useEffect(() => {
     QRCode.toDataURL(value, {
       width: size * 2,
       margin: 1,
       errorCorrectionLevel: 'H',
-      color: { dark: '#000000', light: '#ffffff' },
+      color: { dark: fg, light: '#ffffff' },
     }).then(setUrl)
-  }, [value, size])
+  }, [value, size, fg])
+  const bg = skin?.bg?.length ? `linear-gradient(135deg, ${skin.bg[0]}, ${skin.bg[1]})` : '#ffffff'
   if (!url) return <div className="rounded-2xl bg-white/10 shimmer" style={{ width: size, height: size }} />
   return (
-    <div className="relative rounded-2xl bg-white p-3 inline-block" style={{ width: size + 24, height: size + 24 }}>
+    <div className="relative rounded-2xl p-3 inline-block" style={{ width: size + 24, height: size + 24, background: bg }}>
       <img src={url} width={size} height={size} alt="QR" className="rounded-md" />
       {withLogo && (
         <span className="absolute inset-0 m-auto w-11 h-11 rounded-xl bg-white border border-black/5 flex items-center justify-center overflow-hidden">

@@ -22,11 +22,12 @@ import {
   Check,
 } from 'lucide-react'
 import { useBank, useToast } from '../../store'
-import { inr } from '../../lib/utils'
+import { inr, inrFull } from '../../lib/utils'
 import { BankLogo } from '../../components/Cards'
-import { Avatar, Sheet, Button } from '../../components/ui'
+import { Avatar, Sheet, Button, PinPad, RefreshButton } from '../../components/ui'
+import { PaySourceSelector, type PaySource } from '../../components/Pay'
 import { TxnIcon, txnMeta } from '../../components/Txn'
-import type { Transaction } from '../../lib/types'
+import type { Transaction, MoneyRequest } from '../../lib/types'
 
 export default function Home() {
   const nav = useNavigate()
@@ -40,6 +41,7 @@ export default function Home() {
   const respondMoneyRequest = useBank((s) => s.respondMoneyRequest)
   const addMoneyRequest = useBank((s) => s.addMoneyRequest)
   const withdrawRequest = useBank((s) => s.withdrawRequest)
+  const refreshHome = useBank((s) => s.refreshHome)
 
   const me = users.find((u) => u.id === session?.userId)
   if (!me) return null
@@ -54,6 +56,30 @@ export default function Home() {
   const [addOpen, setAddOpen] = useState(false)
   const [addAmt, setAddAmt] = useState('')
   const [copied, setCopied] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [payReq, setPayReq] = useState<MoneyRequest | null>(null)
+  const [paySource, setPaySource] = useState<PaySource>('balance')
+
+  const creditCard = me.cards.find((c) => c.type === 'credit' && c.status === 'active')
+  const cardAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
+
+  const doRefresh = async () => {
+    setRefreshing(true)
+    await refreshHome()
+    setRefreshing(false)
+  }
+
+  const doPayRequest = async (pin: string) => {
+    if (!payReq) return
+    if (pin !== me.pin) {
+      setPayReq(null)
+      toast('Incorrect PIN', 'error')
+      return
+    }
+    const res = await respondMoneyRequest(payReq.id, 'pay', paySource)
+    setPayReq(null)
+    toast(res.ok ? 'Payment sent' : res.error || 'Failed', res.ok ? 'success' : 'error')
+  }
 
   const copyUpi = async () => {
     try {
@@ -115,7 +141,15 @@ export default function Home() {
         <div className="absolute -bottom-20 -left-10 w-48 h-48 rounded-full bg-black/15" />
         <div className="relative">
           <div className="flex items-center justify-between">
-            <p className="text-[12px] font-medium opacity-85">Total Balance</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[12px] font-medium opacity-85">Total Balance</p>
+              <RefreshButton
+                onClick={doRefresh}
+                refreshing={refreshing}
+                size={14}
+                className="!p-1 bg-white/15 hover:bg-white/25 !text-white"
+              />
+            </div>
             <button
               onClick={copyUpi}
               className="flex items-center gap-1 bg-white/15 hover:bg-white/25 transition-colors rounded-lg px-2 py-1 text-[11px] font-semibold"
@@ -172,9 +206,9 @@ export default function Home() {
                   <span className="text-[14px] font-bold text-text">{inr(r.amount)}</span>
                   <div className="flex gap-1.5">
                     <button
-                      onClick={async () => {
-                        const res = await respondMoneyRequest(r.id, 'pay')
-                        toast(res.ok ? 'Payment sent' : res.error || 'Failed', res.ok ? 'success' : 'error')
+                      onClick={() => {
+                        setPaySource('balance')
+                        setPayReq(r)
                       }}
                       className="text-[11px] font-bold bg-primary text-white px-3 py-1.5 rounded-lg"
                     >
@@ -288,6 +322,28 @@ export default function Home() {
             Request Deposit
           </Button>
         </div>
+      </Sheet>
+
+      {/* pay a money request sheet */}
+      <Sheet open={!!payReq} onClose={() => setPayReq(null)} title="Pay Request">
+        {payReq && (
+          <div className="pt-2 flex flex-col gap-3 pb-2">
+            <div className="text-center">
+              <p className="text-[13px] text-muted">Paying</p>
+              <p className="text-[22px] font-bold text-text">{inrFull(payReq.amount)}</p>
+              <p className="text-[12.5px] text-muted">{payReq.note || 'Money request'}</p>
+            </div>
+            <PaySourceSelector
+              source={paySource}
+              onChange={setPaySource}
+              balance={me.balance}
+              hasCard={!!creditCard}
+              cardAvailable={cardAvailable}
+              cardLimit={creditCard?.creditLimit}
+            />
+            <PinPad onComplete={doPayRequest} />
+          </div>
+        )}
       </Sheet>
     </div>
   )

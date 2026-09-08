@@ -3,7 +3,7 @@ import { Search, Download, ArrowDownLeft, ArrowUpRight, ListFilter } from 'lucid
 import { useBank, useToast } from '../../store'
 import { downloadCsv, fmtDay, fmtTime, inr } from '../../lib/utils'
 import { TxnIcon, txnMeta } from '../../components/Txn'
-import { Empty, TopBar, inputCls } from '../../components/ui'
+import { Empty, TopBar, inputCls, RefreshButton } from '../../components/ui'
 import type { Transaction } from '../../lib/types'
 
 type Filter = 'all' | 'credit' | 'debit'
@@ -12,11 +12,20 @@ export default function Statement() {
   const session = useBank((s) => s.session)
   const users = useBank((s) => s.users)
   const transactions = useBank((s) => s.transactions)
+  const refreshTxns = useBank((s) => s.refreshTxns)
+  const refreshUsers = useBank((s) => s.refreshUsers)
   const toast = useToast((s) => s.toast)
 
   const me = users.find((u) => u.id === session?.userId)!
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
+  const [refreshing, setRefreshing] = useState(false)
+
+  const doRefresh = async () => {
+    setRefreshing(true)
+    await Promise.all([refreshTxns(), refreshUsers()])
+    setRefreshing(false)
+  }
 
   const mine = useMemo(
     () =>
@@ -78,9 +87,12 @@ export default function Statement() {
       <TopBar
         title="Statement"
         right={
-          <button onClick={exportCsv} className="p-1.5">
-            <Download size={19} className="text-muted" />
-          </button>
+          <div className="flex items-center gap-1">
+            <RefreshButton onClick={doRefresh} refreshing={refreshing} />
+            <button onClick={exportCsv} className="p-1.5">
+              <Download size={19} className="text-muted" />
+            </button>
+          </div>
         }
       />
 

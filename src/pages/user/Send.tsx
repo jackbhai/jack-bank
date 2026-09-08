@@ -4,6 +4,7 @@ import { Search, ChevronLeft, CheckCircle2 } from 'lucide-react'
 import { useBank, useToast } from '../../store'
 import { inr, inrFull } from '../../lib/utils'
 import { Avatar, Button, Segmented, Sheet, PinPad, TopBar, Modal, inputCls } from '../../components/ui'
+import { PaySourceSelector, type PaySource } from '../../components/Pay'
 import type { User } from '../../lib/types'
 import { fxCoin } from '../../lib/fx'
 
@@ -23,7 +24,11 @@ export default function Send() {
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [pinOpen, setPinOpen] = useState(false)
+  const [source, setSource] = useState<PaySource>('balance')
   const [done, setDone] = useState<{ amount: number; to: string; ref: string } | null>(null)
+
+  const creditCard = me.cards.find((c) => c.type === 'credit' && c.status === 'active')
+  const cardAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -42,7 +47,7 @@ export default function Send() {
       toast('Incorrect PIN', 'error')
       return
     }
-    const res = await transfer(Number(amount), me.id, selected.id, method === 'account' ? 'account' : 'upi', note || 'Money transfer')
+    const res = await transfer(Number(amount), me.id, selected.id, method === 'account' ? 'account' : 'upi', note || 'Money transfer', source)
     setPinOpen(false)
     if (res.ok) {
       fxCoin()
@@ -155,8 +160,20 @@ export default function Send() {
 
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note (optional)" className={inputCls} />
 
+          <div className="card p-3.5">
+            <p className="text-[12px] font-semibold text-muted uppercase tracking-wide mb-2">Pay using</p>
+            <PaySourceSelector
+              source={source}
+              onChange={setSource}
+              balance={me.balance}
+              hasCard={!!creditCard}
+              cardAvailable={cardAvailable}
+              cardLimit={creditCard?.creditLimit}
+            />
+          </div>
+
           <Button full disabled={!amount || Number(amount) <= 0} onClick={() => setPinOpen(true)}>
-            Pay {amount && Number(amount) > 0 ? inrFull(Number(amount)) : ''}
+            Pay {amount && Number(amount) > 0 ? inrFull(Number(amount)) : ''}{source === 'card' ? ' · Credit Card' : ''}
           </Button>
         </div>
       )}
@@ -165,7 +182,7 @@ export default function Send() {
         <div className="pt-3 text-center mb-2">
           <p className="text-[13px] text-muted">Paying</p>
           <p className="text-[20px] font-bold text-text">{inrFull(Number(amount || 0))}</p>
-          {selected && <p className="text-[13px] text-muted">to {selected.name}</p>}
+          {selected && <p className="text-[13px] text-muted">to {selected.name}{source === 'card' ? ' · via Credit Card' : ''}</p>}
         </div>
         <PinPad onComplete={doPay} />
       </Sheet>

@@ -6,6 +6,7 @@ import { inr, inrPrice, fmtTime, fmtDate } from '../../lib/utils'
 import { pct, upDown, spark, fmtVol, fmtCr, chartSeries, type ChartRange } from '../../lib/market'
 import type { Stock, StockHolding } from '../../lib/types'
 import { Button, Field, Segmented, Sheet, TopBar, inputCls } from '../../components/ui'
+import { PaySourceSelector, type PaySource } from '../../components/Pay'
 
 export default function Stocks() {
   const nav = useNavigate()
@@ -33,6 +34,7 @@ export default function Stocks() {
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market')
   const [qty, setQty] = useState('')
   const [limitPrice, setLimitPrice] = useState('')
+  const [source, setSource] = useState<PaySource>('balance')
 
   const listStocks = useMemo(() => stocks.filter((s) => s.kind === kind), [stocks, kind])
 
@@ -63,10 +65,14 @@ export default function Stocks() {
     setTradeOpen(true)
   }
 
+  const creditCard = me.cards.find((c) => c.type === 'credit' && c.status === 'active')
+  const cardAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
+
   const doOrder = async () => {
     if (!selected) return
     const res = await stockPlaceOrder(
       me.id, selected.id, side, orderType, Number(qty), orderType === 'limit' ? Number(limitPrice) : undefined,
+      side === 'buy' && orderType === 'market' ? source : 'balance',
     )
     toast(res.ok ? 'Order executed' : res.error || 'Failed', res.ok ? 'success' : 'error')
     if (res.ok) setTradeOpen(false)
@@ -280,6 +286,34 @@ export default function Stocks() {
 
               <PriceChart series={series} positive={d >= 0} range={range} />
 
+              {(() => {
+                const ticks = [...(detail.history || [])].slice(-20).reverse()
+                if (ticks.length < 2) return null
+                return (
+                  <div className="card p-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-[12px] font-semibold text-muted uppercase tracking-wide">Last 20 prices</p>
+                      <span className="text-[11px] text-faint flex items-center gap-1"><Clock size={11} /> live ticks</span>
+                    </div>
+                    <div className="flex flex-col max-h-44 overflow-y-auto no-scrollbar">
+                      {ticks.map((tk, i) => {
+                        const prev = ticks[i + 1] ? ticks[i + 1].p : tk.p
+                        const chg = prev ? ((tk.p - prev) / prev) * 100 : 0
+                        return (
+                          <div key={tk.t + '-' + i} className="flex items-center justify-between py-1.5 border-b border-line last:border-0 text-[12.5px]">
+                            <span className="text-muted tabular-nums">{fmtTime(tk.t)}</span>
+                            <span className="font-semibold text-text tabular-nums">{inrPrice(tk.p)}</span>
+                            <span className={`font-bold tabular-nums ${chg >= 0 ? 'text-success' : 'text-danger'}`}>
+                              {chg >= 0 ? '+' : ''}{chg.toFixed(2)}%
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+
               <div className="grid grid-cols-3 gap-2">
                 <Stat label="Open" value={detail.dayOpen ? inrPrice(detail.dayOpen) : '—'} />
                 <Stat label="Day high" value={detail.dayHigh ? inrPrice(detail.dayHigh) : '—'} />
@@ -334,8 +368,21 @@ export default function Stocks() {
                 </p>
               </div>
             )}
+            {side === 'buy' && orderType === 'market' && (
+              <div className="card p-3.5">
+                <p className="text-[12px] font-semibold text-muted uppercase tracking-wide mb-2">Pay using</p>
+                <PaySourceSelector
+                  source={source}
+                  onChange={setSource}
+                  balance={me.balance}
+                  hasCard={!!creditCard}
+                  cardAvailable={cardAvailable}
+                  cardLimit={creditCard?.creditLimit}
+                />
+              </div>
+            )}
             <Button full disabled={!qty || Number(qty) <= 0 || (orderType === 'limit' && !limitPrice)} onClick={doOrder}>
-              {side === 'buy' ? 'Buy' : 'Sell'} {qty} {selected.symbol}
+              {side === 'buy' ? 'Buy' : 'Sell'} {qty} {selected.symbol}{side === 'buy' && orderType === 'market' && source === 'card' ? ' · Credit Card' : ''}
             </Button>
           </div>
         )}

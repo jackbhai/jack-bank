@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink } from 'react-router-dom'
-import { X, Delete, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
+import { X, Delete, CheckCircle2, AlertTriangle, Info, RefreshCw } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { initials } from '../lib/utils'
 import { useToast } from '../store'
@@ -319,5 +319,29 @@ export function Empty({ icon: Icon, title, sub }: { icon: LucideIcon; title: str
         {sub && <p className="text-[13px] text-muted mt-1">{sub}</p>}
       </div>
     </div>
+  )
+}
+
+/* ---------------- Refresh button ---------------- */
+export function RefreshButton({
+  onClick,
+  refreshing = false,
+  size = 18,
+  className = '',
+}: {
+  onClick: () => void
+  refreshing?: boolean
+  size?: number
+  className?: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={refreshing}
+      aria-label="Refresh"
+      className={`p-1.5 rounded-full text-muted hover:text-text hover:bg-surface2 active:scale-90 transition-all disabled:opacity-50 ${className}`}
+    >
+      <RefreshCw size={size} className={refreshing ? 'animate-spin' : ''} />
+    </button>
   )
 }
