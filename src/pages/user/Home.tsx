@@ -33,7 +33,7 @@ export default function Home() {
   const users = useBank((s) => s.users)
   const transactions = useBank((s) => s.transactions)
   const moneyRequests = useBank((s) => s.moneyRequests)
-  const notifs = useBank((s) => s.notifs)
+  const notifs = useBank((s) => s.notifications)
   const announcements = useBank((s) => s.announcements)
   const respondMoneyRequest = useBank((s) => s.respondMoneyRequest)
   const addMoneyRequest = useBank((s) => s.addMoneyRequest)

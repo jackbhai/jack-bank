@@ -9,7 +9,7 @@ export default function Notifications() {
   const nav = useNavigate()
   const session = useBank((s) => s.session)
   const users = useBank((s) => s.users)
-  const notifs = useBank((s) => s.notifs)
+  const notifs = useBank((s) => s.notifications)
   const markNotifsRead = useBank((s) => s.markNotifsRead)
 
   const me = users.find((u) => u.id === session?.userId)!

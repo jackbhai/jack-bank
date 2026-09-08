@@ -20,7 +20,7 @@ export default function More() {
   const session = useBank((s) => s.session)
   const users = useBank((s) => s.users)
   const logout = useBank((s) => s.logout)
-  const notifs = useBank((s) => s.notifs)
+  const notifs = useBank((s) => s.notifications)
 
   const me = users.find((u) => u.id === session?.userId)!
   const unread = notifs.filter((n) => n.userId === me.id && !n.read).length
