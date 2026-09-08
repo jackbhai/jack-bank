@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useBank } from './store'
 import { Toasts } from './components/ui'
 import { BankLogo } from './components/Cards'
@@ -57,7 +57,7 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Toasts />
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -105,6 +105,6 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
