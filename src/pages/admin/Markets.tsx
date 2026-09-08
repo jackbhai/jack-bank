@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, LineChart, PieChart, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
 import { useBank, useToast } from '../../store'
-import { inrCompact } from '../../lib/utils'
+import { inrCompact, inrPrice } from '../../lib/utils'
 import { pct, upDown, spark } from '../../lib/market'
 import { TopBar } from '../../components/ui'
 
@@ -73,7 +73,7 @@ export default function Markets() {
                   <p className="text-[11px] text-muted">{f.category} · AUM {inrCompact(f.aum * 10000000)}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-[13px] font-bold text-text">₹{f.nav.toFixed(2)}</p>
+                  <p className="text-[13px] font-bold text-text">{inrPrice(f.nav)}</p>
                   <p className={`text-[11px] font-semibold ${ud.cls}`}>{ud.sign}{d.toFixed(2)}%</p>
                 </div>
               </div>
@@ -99,7 +99,7 @@ function Row({ symbol, name, price, change }: { symbol: string; name: string; pr
         <p className="text-[11px] text-muted truncate">{name}</p>
       </div>
       <div className="text-right shrink-0">
-        <p className="text-[13.5px] font-bold text-text">₹{price.toFixed(2)}</p>
+        <p className="text-[13.5px] font-bold text-text">{inrPrice(price)}</p>
         <p className={`text-[11.5px] font-semibold ${ud.cls}`}>{ud.sign}{change.toFixed(2)}%</p>
       </div>
     </div>

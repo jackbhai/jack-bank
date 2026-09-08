@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, TrendingUp, TrendingDown, RefreshCw, LineChart, Clock, XCircle, CheckCircle2, Bitcoin } from 'lucide-react'
 import { useBank, useToast } from '../../store'
-import { inr, fmtTime } from '../../lib/utils'
+import { inr, inrPrice, fmtTime } from '../../lib/utils'
 import { pct, upDown, spark, fmtVol, fmtCr, chartSeries, type ChartRange } from '../../lib/market'
 import type { Stock, StockHolding } from '../../lib/types'
 import { Button, Field, Segmented, Sheet, TopBar, inputCls } from '../../components/ui'
@@ -150,7 +150,7 @@ export default function Stocks() {
                 </div>
                 <div className="flex items-center justify-between mt-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[15px] font-bold text-text">₹{s.price.toFixed(2)}</span>
+                    <span className="text-[15px] font-bold text-text">{inrPrice(s.price)}</span>
                     <span className={`text-[11.5px] font-semibold flex items-center gap-0.5 ${ud.cls}`}>
                       {d >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}{ud.sign}{d.toFixed(2)}%
                     </span>
@@ -179,7 +179,7 @@ export default function Stocks() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-bold text-[14px] text-text">{s.symbol}</p>
-                    <p className="text-[11.5px] text-muted">{h.qty} × avg ₹{h.avgPrice.toFixed(2)}</p>
+                    <p className="text-[11.5px] text-muted">{h.qty} × avg {inrPrice(h.avgPrice)}</p>
                   </div>
                   <button onClick={() => openTrade(s, 'sell')} className="text-[12px] font-bold text-danger bg-danger/10 px-3 py-2 rounded-lg">
                     Sell
@@ -255,7 +255,7 @@ export default function Stocks() {
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${catTint(detail.sector)}`}>{detail.sector}</span>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-[30px] font-bold text-text">₹{detail.price.toFixed(2)}</span>
+                <span className="text-[30px] font-bold text-text">{inrPrice(detail.price)}</span>
                 <span className={`text-[13px] font-bold flex items-center gap-0.5 ${ud.cls}`}>
                   {d >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}{ud.sign}{d.toFixed(2)}%
                 </span>
@@ -284,22 +284,22 @@ export default function Stocks() {
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-                <Stat label="Open" value={`₹${detail.dayOpen ? detail.dayOpen.toFixed(2) : '—'}`} />
-                <Stat label="Day high" value={`₹${detail.dayHigh ? detail.dayHigh.toFixed(2) : '—'}`} />
-                <Stat label="Day low" value={`₹${detail.dayLow ? detail.dayLow.toFixed(2) : '—'}`} />
+                <Stat label="Open" value={detail.dayOpen ? inrPrice(detail.dayOpen) : '—'} />
+                <Stat label="Day high" value={detail.dayHigh ? inrPrice(detail.dayHigh) : '—'} />
+                <Stat label="Day low" value={detail.dayLow ? inrPrice(detail.dayLow) : '—'} />
                 <Stat label="Volume" value={fmtVol(detail.volume)} />
                 <Stat label="Market cap" value={fmtCr(detail.marketCap)} />
                 <Stat label="P/E" value={detail.pe ? detail.pe.toFixed(1) : '—'} />
               </div>
 
               <div className="flex justify-between text-[12px] text-muted">
-                <span>52w low ₹{detail.low52w.toFixed(2)}</span>
-                <span>52w high ₹{detail.high52w.toFixed(2)}</span>
+                <span>52w low {inrPrice(detail.low52w)}</span>
+                <span>52w high {inrPrice(detail.high52w)}</span>
               </div>
 
               {holdFor(detail.id) && (
                 <p className="text-[12.5px] text-muted">
-                  You hold <span className="font-semibold text-text">{holdFor(detail.id)!.qty}</span> shares at avg ₹{holdFor(detail.id)!.avgPrice.toFixed(2)}
+                  You hold <span className="font-semibold text-text">{holdFor(detail.id)!.qty}</span> shares at avg {inrPrice(holdFor(detail.id)!.avgPrice)}
                 </p>
               )}
 
@@ -317,7 +317,7 @@ export default function Stocks() {
         {selected && (
           <div className="pt-1 flex flex-col gap-3">
             <p className="text-[13px] text-muted">
-              {selected.symbol} · <span className="text-text font-semibold">₹{selected.price.toFixed(2)}</span>
+              {selected.symbol} · <span className="text-text font-semibold">{inrPrice(selected.price)}</span>
             </p>
             <Segmented options={[{ id: 'buy', label: 'Buy' }, { id: 'sell', label: 'Sell' }]} value={side} onChange={setSide} />
             <Segmented options={[{ id: 'market', label: 'Market' }, { id: 'limit', label: 'Limit' }]} value={orderType} onChange={setOrderType} />

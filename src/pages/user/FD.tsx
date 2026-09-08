@@ -95,7 +95,7 @@ export default function FD() {
                 onClick={() => setAmount(String(v))}
                 className="py-2 rounded-xl bg-surface2 border border-line text-[12px] font-bold text-text"
               >
-                ₹{v.toLocaleString('en-IN')}
+                {inr(v)}
               </button>
             ))}
           </div>

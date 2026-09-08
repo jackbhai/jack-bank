@@ -1,26 +1,53 @@
 import type { Settings, Transaction, Loan, User } from './types'
 
-export const inr = (n: number): string =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 0,
-  }).format(n)
+export const trimZeros = (v: number, maxDec = 2): string => v.toFixed(maxDec).replace(/\.?0+$/, '')
 
-export const inrFull = (n: number): string =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n)
+const signOf = (n: number): string => (n < 0 ? '-' : '')
+const absOf = (n: number): number => Math.abs(n)
 
+/**
+ * Main money formatter.
+ * ₹1,234 below 1L · ₹1.5L below 1Cr · ₹1.25cr above 1Cr (zeros removed).
+ */
+export const inr = (n: number): string => {
+  const abs = absOf(n)
+  if (abs >= 10000000) return `${signOf(n)}₹${trimZeros(abs / 10000000)}cr`
+  if (abs >= 100000) return `${signOf(n)}₹${trimZeros(abs / 100000)}L`
+  return (
+    signOf(n) +
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(abs)
+  )
+}
+
+/** Exact 2-decimal formatter for payment contexts; compact above 1L to avoid overflow. */
+export const inrFull = (n: number): string => {
+  const abs = absOf(n)
+  if (abs >= 10000000) return `${signOf(n)}₹${trimZeros(abs / 10000000)}cr`
+  if (abs >= 100000) return `${signOf(n)}₹${trimZeros(abs / 100000)}L`
+  return (
+    signOf(n) +
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(abs)
+  )
+}
+
+/** Stock/crypto/Nav price — ₹ with 2 decimals & Indian grouping; compact above 1L. */
+export const inrPrice = (n: number): string => {
+  const abs = absOf(n)
+  if (abs >= 10000000) return `${signOf(n)}₹${trimZeros(abs / 10000000)}cr`
+  if (abs >= 100000) return `${signOf(n)}₹${trimZeros(abs / 100000)}L`
+  return (
+    signOf(n) +
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(abs)
+  )
+}
+
+/** Always-compact for tight stat cards: k / L / cr. */
 export const inrCompact = (n: number): string => {
-  if (Math.abs(n) >= 10000000) return '₹' + (n / 10000000).toFixed(1) + 'Cr'
-  if (Math.abs(n) >= 100000) return '₹' + (n / 100000).toFixed(1) + 'L'
-  if (Math.abs(n) >= 1000) return '₹' + (n / 1000).toFixed(1) + 'k'
-  return '₹' + Math.round(n)
+  const abs = absOf(n)
+  if (abs >= 10000000) return `${signOf(n)}₹${trimZeros(abs / 10000000)}cr`
+  if (abs >= 100000) return `${signOf(n)}₹${trimZeros(abs / 100000)}L`
+  if (abs >= 1000) return `${signOf(n)}₹${trimZeros(abs / 1000)}k`
+  return `${signOf(n)}₹${Math.round(abs)}`
 }
 
 export const fmtDate = (ts: number): string =>

@@ -85,7 +85,7 @@ export default function Loans() {
                     </div>
                     <div className="flex justify-between text-[11.5px] text-muted mt-1.5">
                       <span>{l.emisPaid}/{l.months} EMIs paid</span>
-                      <span>{remaining} left · ₹{l.emi.toLocaleString('en-IN')}/mo</span>
+                      <span>{remaining} left · {inr(l.emi)}/mo</span>
                     </div>
                     <Button
                       full
@@ -114,7 +114,7 @@ export default function Loans() {
               autoFocus
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder={`Up to ${eligible.toLocaleString('en-IN')}`}
+              placeholder={`Up to ${inr(eligible)}`}
               className={inputCls}
             />
           </Field>
@@ -125,7 +125,7 @@ export default function Loans() {
                 onClick={() => setAmount(String(v))}
                 className="py-2 rounded-xl bg-surface2 border border-line text-[12px] font-bold text-text"
               >
-                ₹{v.toLocaleString('en-IN')}
+                {inr(v)}
               </button>
             ))}
           </div>

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, TrendingUp, TrendingDown, PieChart, CalendarClock, Wallet, RefreshCw, ShieldCheck } from 'lucide-react'
 import { useBank, useToast } from '../../store'
-import { inr, inrCompact } from '../../lib/utils'
+import { inr, inrCompact, inrPrice } from '../../lib/utils'
 import { pct, upDown } from '../../lib/market'
 import type { MfFund, MfHolding } from '../../lib/types'
 import { Button, Field, Sheet, TopBar, inputCls } from '../../components/ui'
@@ -133,7 +133,7 @@ export default function MutualFunds() {
               </div>
               <div className="flex items-end justify-between mt-3">
                 <div>
-                  <p className="text-[16px] font-bold text-text">₹{f.nav.toFixed(2)} <span className="text-[11px] text-faint font-medium">NAV</span></p>
+                  <p className="text-[16px] font-bold text-text">{inrPrice(f.nav)} <span className="text-[11px] text-faint font-medium">NAV</span></p>
                   <p className={`text-[12px] font-semibold flex items-center gap-1 ${ud.cls}`}>
                     {d >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />} {ud.sign}{d.toFixed(2)}% today
                   </p>
@@ -170,7 +170,7 @@ export default function MutualFunds() {
                 <p className="text-[18px] font-bold text-text mt-2">{selected.name}</p>
                 <p className="text-[12.5px] text-muted">{selected.fundHouse} · {selected.risk} risk</p>
                 <div className="flex items-baseline gap-2 mt-3">
-                  <span className="text-[28px] font-bold text-text">₹{selected.nav.toFixed(2)}</span>
+                  <span className="text-[28px] font-bold text-text">{inrPrice(selected.nav)}</span>
                   <span className="text-[12px] text-faint">NAV</span>
                 </div>
               </div>
@@ -237,7 +237,7 @@ export default function MutualFunds() {
             </Field>
             {Number(amount) > 0 && (
               <div className="card p-3.5 text-[13px]">
-                You'll get approx <span className="font-bold text-text">{estUnits}</span> units at NAV ₹{selected.nav.toFixed(2)}
+                You'll get approx <span className="font-bold text-text">{estUnits}</span> units at NAV {inrPrice(selected.nav)}
               </div>
             )}
             <div className="flex items-center gap-1.5 text-[11.5px] text-muted">
