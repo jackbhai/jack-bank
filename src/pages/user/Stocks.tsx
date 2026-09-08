@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, TrendingUp, TrendingDown, RefreshCw, LineChart, Clock, XCircle, CheckCircle2, Bitcoin } from 'lucide-react'
 import { useBank, useToast } from '../../store'
-import { inr, inrPrice, fmtTime } from '../../lib/utils'
+import { inr, inrPrice, fmtTime, fmtDate } from '../../lib/utils'
 import { pct, upDown, spark, fmtVol, fmtCr, chartSeries, type ChartRange } from '../../lib/market'
 import type { Stock, StockHolding } from '../../lib/types'
 import { Button, Field, Segmented, Sheet, TopBar, inputCls } from '../../components/ui'
@@ -18,6 +18,7 @@ export default function Stocks() {
   const stockPlaceOrder = useBank((s) => s.stockPlaceOrder)
   const stockCancelOrder = useBank((s) => s.stockCancelOrder)
   const marketTick = useBank((s) => s.marketTick)
+  const pricesUpdatedAt = useBank((s) => s.pricesUpdatedAt)
 
   const me = users.find((u) => u.id === session?.userId)!
   const myHoldings = holdings.filter((h) => h.userId === me.id && h.qty > 0)
@@ -102,7 +103,16 @@ export default function Stocks() {
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-2 flex items-center gap-2">
+        <span className="relative flex h-2 w-2 shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-60" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+        </span>
+        <span className="text-[11px] font-semibold text-success">LIVE</span>
+        <span className="text-[11px] text-muted">rates update every minute · last {pricesUpdatedAt ? fmtTime(pricesUpdatedAt) : '—'}</span>
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
         <button onClick={() => setKind('equity')} className={`flex-1 py-2 rounded-xl text-[12.5px] font-bold border transition-all ${kind === 'equity' ? 'bg-primary/12 border-primary text-primary' : 'border-line text-muted'}`}>
           Equities · {stocks.filter((s) => s.kind === 'equity').length}
         </button>
@@ -244,7 +254,6 @@ export default function Stocks() {
           const d = pct(detail.price, detail.prevClose)
           const ud = upDown(d)
           const series = chartSeries(detail.symbol, range, detail.price, detail.history)
-          const sp = spark(series, 300, 90)
           return (
             <div className="pt-1 flex flex-col gap-4">
               <div className="flex items-start justify-between">
@@ -269,19 +278,7 @@ export default function Stocks() {
                 ))}
               </div>
 
-              <svg viewBox="0 0 300 90" className="w-full h-28 rounded-xl bg-surface2">
-                {sp.line && (
-                  <>
-                    <path d={sp.area} fill={d >= 0 ? 'rgba(52,211,153,0.14)' : 'rgba(251,113,133,0.14)'} />
-                    <path d={sp.line} fill="none" stroke={d >= 0 ? 'var(--success)' : 'var(--danger)'} strokeWidth="1.8" />
-                  </>
-                )}
-              </svg>
-              <div className="flex justify-between text-[10px] text-faint -mt-1">
-                <span>open</span>
-                <span>{range} price action</span>
-                <span>now</span>
-              </div>
+              <PriceChart series={series} positive={d >= 0} range={range} />
 
               <div className="grid grid-cols-3 gap-2">
                 <Stat label="Open" value={detail.dayOpen ? inrPrice(detail.dayOpen) : '—'} />
@@ -362,6 +359,58 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="bg-surface2 rounded-xl p-2.5">
       <p className="text-[10px] text-muted uppercase tracking-wide">{label}</p>
       <p className="text-[13px] font-bold text-text mt-0.5">{value}</p>
+    </div>
+  )
+}
+
+/** Real-looking price chart: gridlines, gradient area, min/max & time axis. */
+function PriceChart({ series, positive, range }: { series: { t: number; p: number }[]; positive: boolean; range: ChartRange }) {
+  const gid = useId().replace(/:/g, '')
+  if (!series || series.length < 2) return <div className="w-full h-32 rounded-xl bg-surface2 flex items-center justify-center text-[11px] text-faint">Waiting for market data…</div>
+  const W = 340
+  const H = 130
+  const PL = 52
+  const PR = 8
+  const PT = 12
+  const PB = 20
+  const pts = series.slice(-120)
+  const prices = pts.map((p) => p.p)
+  const min = Math.min(...prices)
+  const max = Math.max(...prices)
+  const rng = max - min || 1
+  const iw = W - PL - PR
+  const ih = H - PT - PB
+  const x = (i: number) => PL + (i / Math.max(1, pts.length - 1)) * iw
+  const y = (p: number) => PT + (1 - (p - min) / rng) * ih
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.p).toFixed(1)}`).join(' ')
+  const area = `${line} L${x(pts.length - 1).toFixed(1)},${(PT + ih).toFixed(1)} L${x(0).toFixed(1)},${(PT + ih).toFixed(1)} Z`
+  const color = positive ? 'var(--success)' : 'var(--danger)'
+  const grid = [0, 0.25, 0.5, 0.75, 1].map((f) => max - f * rng)
+  const t0 = pts[0].t
+  const t1 = pts[pts.length - 1].t
+  const leftLabel = range === '1Y' ? fmtDate(t0) : range === 'Live' ? fmtTime(t0) : fmtTime(t0)
+
+  return (
+    <div className="rounded-xl bg-surface2 p-2">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+        <defs>
+          <linearGradient id={`pg-${gid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {grid.map((g, i) => (
+          <g key={i}>
+            <line x1={PL} y1={y(g)} x2={W - PR} y2={y(g)} stroke="var(--line)" strokeWidth="1" strokeDasharray={i === 0 ? '0' : '3 4'} opacity={i === 0 ? 1 : 0.5} />
+            <text x={PL - 5} y={y(g) + 3} fontSize="8.5" fill="var(--faint)" textAnchor="end">{inrPrice(g)}</text>
+          </g>
+        ))}
+        <path d={area} fill={`url(#pg-${gid})`} />
+        <path d={line} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={x(pts.length - 1)} cy={y(pts[pts.length - 1].p)} r="2.6" fill={color} />
+        <text x={PL} y={H - 5} fontSize="8.5" fill="var(--faint)">{leftLabel}</text>
+        <text x={W - PR} y={H - 5} fontSize="8.5" fill="var(--faint)" textAnchor="end">{range === 'Live' ? 'now' : 'now'}</text>
+      </svg>
     </div>
   )
 }

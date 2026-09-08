@@ -346,6 +346,7 @@ interface BankState {
   gatewayOrders: GatewayOrder[]
   kyc: KycDoc | null
   userSettings: Record<string, Record<string, any>>
+  pricesUpdatedAt: number
 
   init: () => Promise<void>
   login: (email: string, password: string) => Promise<Res & { role?: string }>
@@ -413,11 +414,14 @@ interface BankState {
   refreshNotifs: () => Promise<void>
   refreshAnnouncements: () => Promise<void>
   refreshMarket: () => Promise<void>
+  refreshPrices: () => Promise<void>
   refreshGateway: () => Promise<void>
   refreshKyc: () => Promise<void>
 }
 
 let realtime: ReturnType<typeof supabase.channel> | null = null
+let ticker: ReturnType<typeof setInterval> | null = null
+let lastPricesAt = 0
 
 export const useBank = create<BankState>()((set, get) => ({
   booting: true,
@@ -445,6 +449,7 @@ export const useBank = create<BankState>()((set, get) => ({
   gatewayOrders: [],
   kyc: null,
   userSettings: {},
+  pricesUpdatedAt: 0,
 
   /* ---------------- loaders ---------------- */
   refreshUsers: async () => {
@@ -572,11 +577,7 @@ export const useBank = create<BankState>()((set, get) => ({
   refreshMarket: async () => {
     const s = get()
     if (!s.session) return
-    const fundQ = supabase.from('jb_mf_funds').select('*').order('name')
-    const stockQ = supabase.from('jb_stocks').select('*').order('name')
-    const [funds, stocks] = await Promise.all([fundQ, stockQ])
-    if (funds.data) set({ mfFunds: funds.data.map(mapMfFund) })
-    if (stocks.data) set({ stocks: stocks.data.map(mapStock) })
+    await get().refreshPrices()
     const holdQ =
       s.session.role === 'admin'
         ? supabase.from('jb_mf_holdings').select('*')
@@ -605,6 +606,19 @@ export const useBank = create<BankState>()((set, get) => ({
       stockHoldings: (sHolds.data ?? []).map(mapStockHolding),
       stockTrades: (trades.data ?? []).map(mapStockTrade),
     })
+  },
+
+  refreshPrices: async () => {
+    const s = get()
+    if (!s.session) return
+    const [funds, stocks] = await Promise.all([
+      supabase.from('jb_mf_funds').select('*').order('name'),
+      supabase.from('jb_stocks').select('*').order('name'),
+    ])
+    if (funds.data) set({ mfFunds: funds.data.map(mapMfFund) })
+    if (stocks.data) set({ stocks: stocks.data.map(mapStock) })
+    lastPricesAt = Date.now()
+    set({ pricesUpdatedAt: Date.now() })
   },
 
   refreshGateway: async () => {
@@ -644,7 +658,7 @@ export const useBank = create<BankState>()((set, get) => ({
     supabase.auth.onAuthStateChange((_e, sess) => {
       if (!sess && get().session) {
         get().stopRealtime()
-        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {} })
+        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0 })
       }
     })
     set({ booting: false })
@@ -692,7 +706,7 @@ export const useBank = create<BankState>()((set, get) => ({
   logout: async () => {
     await supabase.auth.signOut()
     get().stopRealtime()
-    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {} })
+    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0 })
   },
 
   loadAll: async () => {
@@ -715,10 +729,26 @@ export const useBank = create<BankState>()((set, get) => ({
       supabase.removeChannel(realtime)
       realtime = null
     }
+    if (ticker) {
+      clearInterval(ticker)
+      ticker = null
+    }
   },
 
   startRealtime: () => {
     get().stopRealtime()
+    // fallback ticker: if realtime ever stalls, re-pull cron-updated prices so
+    // the screen keeps moving every minute. (pg_cron is the single source of
+    // price movement; we never mutate the market from the client.)
+    if (!ticker) {
+      ticker = setInterval(() => {
+        const st = get()
+        if (!st.session || !st.ready) return
+        if (Date.now() - lastPricesAt > 70_000) {
+          get().refreshPrices()
+        }
+      }, 30_000)
+    }
     realtime = supabase
       .channel('jack-bank-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_transactions' }, () => get().refreshTxns())
@@ -730,8 +760,9 @@ export const useBank = create<BankState>()((set, get) => ({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_fds' }, () => get().refreshFds())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_loans' }, () => get().refreshLoans())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_announcements' }, () => get().refreshAnnouncements())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_stocks' }, () => get().refreshMarket())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_mf_funds' }, () => get().refreshMarket())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_stocks' }, () => get().refreshPrices())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_mf_funds' }, () => get().refreshPrices())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_stock_orders' }, () => get().refreshMarket())
       .subscribe()
   },
 

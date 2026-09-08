@@ -57,19 +57,22 @@ function mulberry32(seed: number) {
   }
 }
 
-/** Deterministic historical price series ending at `endPrice`. */
+/** Deterministic historical price series ending at `endPrice` — random walk with
+ *  mean-reverting drift (Brownian bridge), so charts look like real markets. */
 export function seededSeries(symbol: string, n: number, endPrice: number, vol: number): number[] {
   const rand = mulberry32(hashStr(symbol))
-  const out: number[] = []
-  let p = endPrice * (1 - (rand() - 0.45) * vol * 6)
-  out.push(p)
-  const step = (endPrice - p) / n
+  const start = endPrice * (0.62 + rand() * 0.72) // start anywhere between 0.62x–1.34x of end
+  const out: number[] = [start]
+  let p = start
   for (let i = 1; i <= n; i++) {
-    p = p + step + (rand() - 0.5) * vol * endPrice
-    if (p <= 0) p = endPrice * 0.01
+    const remaining = n - i + 1
+    const drift = (endPrice - p) / remaining // pull toward end price
+    const noise = (rand() - 0.5) * 2 * vol * endPrice
+    p = p + drift + noise
+    if (p <= endPrice * 0.01) p = endPrice * 0.02
     out.push(p)
   }
-  out[out.length - 1] = endPrice
+  out[n] = endPrice
   return out
 }
 
