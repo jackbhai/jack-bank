@@ -26,7 +26,8 @@ export default function Pay() {
   const [done, setDone] = useState<{ amount: number; ref: string } | null>(null)
 
   const creditCard = me.cards.find((c) => c.type === 'credit' && c.status === 'active')
-  const cardAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
+  const debitCard = me.cards.find((c) => c.type === 'debit' && c.status === 'active')
+  const creditAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
 
   if (!to) {
     return (
@@ -102,15 +103,16 @@ export default function Pay() {
           source={source}
           onChange={setSource}
           balance={me.balance}
-          hasCard={!!creditCard}
-          cardAvailable={cardAvailable}
-          cardLimit={creditCard?.creditLimit}
+          hasDebit={!!debitCard}
+          hasCredit={!!creditCard}
+          creditAvailable={creditAvailable}
+          creditLimit={creditCard?.creditLimit}
         />
       </div>
 
       <div className="mt-5">
         <Button full disabled={!amount || Number(amount) <= 0} onClick={() => setPinOpen(true)}>
-          Pay {amount && Number(amount) > 0 ? inrFull(Number(amount)) : ''}{source === 'card' ? ' · Credit Card' : ''}
+          Pay {amount && Number(amount) > 0 ? inrFull(Number(amount)) : ''}{source === 'card' ? ' · Credit Card' : source === 'debit' ? ' · Debit Card' : ''}
         </Button>
       </div>
 

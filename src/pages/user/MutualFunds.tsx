@@ -64,7 +64,8 @@ export default function MutualFunds() {
   }
 
   const creditCard = me.cards.find((c) => c.type === 'credit' && c.status === 'active')
-  const cardAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
+  const debitCard = me.cards.find((c) => c.type === 'debit' && c.status === 'active')
+  const creditAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
 
   const doBuy = async () => {
     if (!selected) return
@@ -251,17 +252,18 @@ export default function MutualFunds() {
                 source={source}
                 onChange={setSource}
                 balance={me.balance}
-                hasCard={!!creditCard}
-                cardAvailable={cardAvailable}
-                cardLimit={creditCard?.creditLimit}
+                hasDebit={!!debitCard}
+                hasCredit={!!creditCard}
+                creditAvailable={creditAvailable}
+                creditLimit={creditCard?.creditLimit}
               />
             </div>
             <Button
               full
-              disabled={!amount || Number(amount) < selected.minLumpsum || (source === 'balance' ? Number(amount) > me.balance : Number(amount) > cardAvailable)}
+              disabled={!amount || Number(amount) < selected.minLumpsum || (source === 'card' ? Number(amount) > creditAvailable : Number(amount) > me.balance)}
               onClick={doBuy}
             >
-              Confirm · {amount ? inr(Number(amount)) : ''}{source === 'card' ? ' · Credit Card' : ''}
+              Confirm · {amount ? inr(Number(amount)) : ''}{source === 'card' ? ' · Credit Card' : source === 'debit' ? ' · Debit Card' : ''}
             </Button>
           </div>
         )}

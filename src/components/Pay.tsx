@@ -1,43 +1,37 @@
 import { Segmented } from './ui'
 import { inr } from '../lib/utils'
 
-export type PaySource = 'balance' | 'card'
+export type PaySource = 'balance' | 'debit' | 'card'
 
 export function PaySourceSelector({
   source,
   onChange,
   balance,
-  hasCard,
-  cardAvailable,
-  cardLimit,
+  hasDebit,
+  hasCredit,
+  creditAvailable,
+  creditLimit,
 }: {
   source: PaySource
   onChange: (s: PaySource) => void
   balance: number
-  hasCard: boolean
-  cardAvailable: number
-  cardLimit?: number
+  hasDebit: boolean
+  hasCredit: boolean
+  creditAvailable: number
+  creditLimit?: number
 }) {
-  if (!hasCard) {
-    return (
-      <p className="text-[11.5px] text-muted">
-        Paying from balance {inr(balance)} · no active credit card
-      </p>
-    )
-  }
+  const options: { id: PaySource; label: string }[] = [{ id: 'balance', label: 'Balance' }]
+  if (hasDebit) options.push({ id: 'debit', label: 'Debit Card' })
+  if (hasCredit) options.push({ id: 'card', label: 'Credit Card' })
+
   return (
     <div>
-      <Segmented
-        options={[
-          { id: 'balance', label: 'Balance' },
-          { id: 'card', label: 'Credit Card' },
-        ]}
-        value={source}
-        onChange={onChange}
-      />
+      <Segmented options={options} value={source} onChange={onChange} />
       <p className="text-[11.5px] text-muted mt-2">
         {source === 'card'
-          ? `Available credit ${inr(cardAvailable)}${cardLimit != null ? ` of ${inr(cardLimit)}` : ''} · amount adds to your card dues`
+          ? `Available credit ${inr(creditAvailable)}${creditLimit != null ? ` of ${inr(creditLimit)}` : ''} · amount adds to your card dues`
+          : source === 'debit'
+          ? `Debit card spends from your balance ${inr(balance)}`
           : `Paying from balance ${inr(balance)}`}
       </p>
     </div>

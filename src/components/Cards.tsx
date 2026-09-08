@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import QRCode from 'qrcode'
 import type { Card } from '../lib/types'
 import { maskCard } from '../lib/utils'
@@ -54,40 +54,128 @@ function NetworkMark({ network }: { network: Card['network'] }) {
   )
 }
 
-/* ---------------- Debit card ---------------- */
-export function DebitCard({ card, name }: { card: Card; name: string }) {
+/* ---------------- Contactless + hologram bits ---------------- */
+function Contactless() {
   return (
-    <div className="relative aspect-[1.58] w-full rounded-2xl p-4 brand-gradient-2 text-white overflow-hidden shadow-xl">
-      <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-white/10 blur-sm" />
-      <div className="absolute -bottom-20 -left-10 w-52 h-52 rounded-full bg-black/15" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path d="M6.5 9.5a8 8 0 0 1 11 0M8.8 12.2a4.5 4.5 0 0 1 6.4 0M11 15a1.4 1.4 0 0 1 2 0" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" opacity="0.85" />
+    </svg>
+  )
+}
+
+function Hologram() {
+  return (
+    <svg width="34" height="34" viewBox="0 0 34 34">
+      <defs>
+        <linearGradient id="holo" x1="0" y1="0" x2="34" y2="34">
+          <stop offset="0" stopColor="#c9d4ff" />
+          <stop offset="0.5" stopColor="#8be9fd" />
+          <stop offset="1" stopColor="#f5c2ff" />
+        </linearGradient>
+      </defs>
+      <circle cx="17" cy="17" r="15" fill="url(#holo)" opacity="0.9" />
+      <circle cx="17" cy="17" r="9" fill="none" stroke="#ffffff" strokeOpacity="0.5" />
+      <path d="M17 2v30M2 17h30" stroke="#ffffff" strokeOpacity="0.35" />
+      <circle cx="17" cy="17" r="3" fill="#ffffff" opacity="0.8" />
+    </svg>
+  )
+}
+
+function CardBack({ card, name }: { card: Card; name: string }) {
+  return (
+    <div className="flip-face flip-back rounded-2xl text-white overflow-hidden shadow-xl relative" style={{ background: 'linear-gradient(135deg,#15151f 0%,#1e1a2b 55%,#17171f 100%)' }}>
+      <div className="absolute top-5 inset-x-0 h-11 bg-black/90" />
+      <div className="relative h-full flex flex-col justify-between p-4 pt-[4.4rem]">
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <div className="h-7 bg-white/85 rounded-sm flex items-center justify-end pr-2">
+              <span className="font-mono text-[11px] text-black italic tracking-widest">{card.cvv}</span>
+            </div>
+            <p className="text-[8px] uppercase tracking-widest opacity-50 mt-1">Authorised signature — not valid unless signed</p>
+          </div>
+          <Hologram />
+        </div>
+        <div>
+          <p className="text-[9px] leading-snug opacity-70">
+            This card is the property of Jack Bank. Use of this card is subject to the Jack Bank simulation agreement.
+          </p>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-[10px] font-bold tracking-widest opacity-80">JACK BANK</span>
+            <NetworkMark network={card.network} />
+          </div>
+          <p className="text-[8px] opacity-40 text-center mt-1.5">Tap to flip · {name}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CardFront({
+  card,
+  name,
+  typeLabel,
+  gradient,
+  extra,
+}: {
+  card: Card
+  name: string
+  typeLabel: string
+  gradient: string
+  extra?: ReactNode
+}) {
+  return (
+    <div className="flip-face rounded-2xl p-4 text-white overflow-hidden shadow-xl relative" style={{ background: gradient }}>
+      {/* decorative pattern + glow */}
+      <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '14px 14px' }} />
+      <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-white/15 blur-sm" />
+      <div className="absolute -bottom-24 -left-12 w-56 h-56 rounded-full bg-black/20" />
+      <div className="absolute -top-24 left-1/3 w-40 h-40 rounded-full bg-white/5" />
+      <div className="absolute inset-0 shine" />
       <div className="relative h-full flex flex-col justify-between">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             <BankLogo size={22} />
-            <span className="text-[12px] font-semibold opacity-90">Jack Bank</span>
+            <span className="text-[12px] font-semibold opacity-90 tracking-wide">Jack Bank</span>
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-widest bg-white/20 rounded-md px-2 py-0.5">
-            {card.type}
+          <span className="text-[9px] font-bold uppercase tracking-[0.18em] bg-white/15 backdrop-blur rounded-md px-2 py-0.5 border border-white/10">
+            {typeLabel}
           </span>
         </div>
         <div className="flex items-center gap-4">
           <Chip />
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="opacity-90">
-            <path d="M6 8h12M6 12h12M6 16h8" stroke="#fff" strokeWidth="2" strokeLinecap="round" opacity="0.6" />
-          </svg>
+          <Contactless />
         </div>
-        <p className="font-mono tracking-[0.12em] text-[17px]">{card.number}</p>
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-[9px] uppercase tracking-widest opacity-70">Card Holder</p>
-            <p className="text-[13px] font-semibold">{card.holderName}</p>
+        <p className="font-mono tracking-[0.14em] text-[18px] drop-shadow-sm">{card.number}</p>
+        <div className="flex items-end justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[8px] uppercase tracking-[0.2em] opacity-60">Card holder</p>
+            <p className="text-[12.5px] font-semibold truncate">{card.holderName}</p>
           </div>
           <div>
-            <p className="text-[9px] uppercase tracking-widest opacity-70">Expires</p>
-            <p className="text-[13px] font-semibold">{card.expiry}</p>
+            <p className="text-[8px] uppercase tracking-[0.2em] opacity-60">Valid thru</p>
+            <p className="text-[12.5px] font-semibold">{card.expiry}</p>
           </div>
           <NetworkMark network={card.network} />
         </div>
+        {extra}
+      </div>
+    </div>
+  )
+}
+
+/* ---------------- Debit card (flip) ---------------- */
+export function DebitCard({ card, name }: { card: Card; name: string }) {
+  const [flipped, setFlipped] = useState(false)
+  return (
+    <div className="flip-scene aspect-[1.58] w-full" onClick={() => setFlipped((f) => !f)}>
+      <div className={`flip-inner ${flipped ? 'flipped' : ''}`}>
+        <CardFront
+          card={card}
+          name={name}
+          typeLabel="Debit"
+          gradient="linear-gradient(130deg,#15204a 0%,#24346e 42%,#3b2f86 78%,#1d1b52 100%)"
+        />
+        <CardBack card={card} name={name} />
       </div>
     </div>
   )
@@ -103,50 +191,21 @@ export function CreditCard({ card }: { card: Card }) {
   return (
     <div className="flip-scene aspect-[1.58] w-full" onClick={() => setFlipped((f) => !f)}>
       <div className={`flip-inner ${flipped ? 'flipped' : ''}`}>
-        {/* front */}
-        <div className="flip-face rounded-2xl p-4 text-white overflow-hidden shadow-xl relative" style={{ background: 'linear-gradient(135deg,#101018 0%,#2a2438 60%,#3a2f4d 100%)' }}>
-          <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-primary/20 blur-sm" />
-          <div className="relative h-full flex flex-col justify-between">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <BankLogo size={22} />
-                <span className="text-[12px] font-semibold opacity-90">Jack Bank Credit</span>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest bg-white/15 rounded-md px-2 py-0.5">Credit</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <Chip />
-            </div>
-            <p className="font-mono tracking-[0.12em] text-[17px]">{card.number}</p>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-[9px] uppercase tracking-widest opacity-70">Card Holder</p>
-                <p className="text-[13px] font-semibold">{card.holderName}</p>
-              </div>
-              <div>
-                <p className="text-[9px] uppercase tracking-widest opacity-70">Expires</p>
-                <p className="text-[13px] font-semibold">{card.expiry}</p>
-              </div>
-              <NetworkMark network={card.network} />
-            </div>
-            <div className="mt-1">
+        <CardFront
+          card={card}
+          name={card.holderName}
+          typeLabel="Credit"
+          gradient="linear-gradient(130deg,#160f22 0%,#2c1f42 45%,#452a52 80%,#1a1226 100%)"
+          extra={
+            <div className="mt-1.5">
               <div className="h-1 rounded-full bg-white/15 overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-primary to-accent" style={{ width: `${usedPct}%` }} />
               </div>
-              <p className="text-[9px] opacity-70 mt-1">Limit used {usedPct}%</p>
+              <p className="text-[8px] opacity-60 mt-1">Limit used {usedPct}%</p>
             </div>
-          </div>
-        </div>
-        {/* back */}
-        <div className="flip-face flip-back rounded-2xl text-white overflow-hidden shadow-xl relative" style={{ background: 'linear-gradient(135deg,#1a1a24 0%,#14141c 100%)' }}>
-          <div className="absolute top-5 inset-x-0 h-10 bg-black" />
-          <div className="relative h-full flex flex-col justify-between p-4 pt-16">
-            <div className="flex justify-end">
-              <div className="bg-white text-black font-mono text-[13px] px-3 py-1.5 rounded-md">{card.cvv}</div>
-            </div>
-            <p className="text-[9px] opacity-60 text-center">Tap card to flip · CVV {card.cvv}</p>
-          </div>
-        </div>
+          }
+        />
+        <CardBack card={card} name={card.holderName} />
       </div>
     </div>
   )

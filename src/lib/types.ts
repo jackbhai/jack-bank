@@ -296,6 +296,23 @@ export interface GatewayOrder {
   settledAt: number | null
 }
 
+export interface GatewayEvent {
+  id: string
+  orderId: string | null
+  merchantId: string | null
+  event: string
+  meta: Record<string, any>
+  createdAt: number
+}
+
+export interface GatewaySettlement {
+  id: string
+  merchantId: string
+  amount: number
+  orders: number
+  settledAt: number
+}
+
 export interface Session {
   role: 'user' | 'admin'
   userId: string

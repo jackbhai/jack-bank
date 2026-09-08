@@ -66,7 +66,8 @@ export default function Stocks() {
   }
 
   const creditCard = me.cards.find((c) => c.type === 'credit' && c.status === 'active')
-  const cardAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
+  const debitCard = me.cards.find((c) => c.type === 'debit' && c.status === 'active')
+  const creditAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
 
   const doOrder = async () => {
     if (!selected) return
@@ -375,14 +376,15 @@ export default function Stocks() {
                   source={source}
                   onChange={setSource}
                   balance={me.balance}
-                  hasCard={!!creditCard}
-                  cardAvailable={cardAvailable}
-                  cardLimit={creditCard?.creditLimit}
+                  hasDebit={!!debitCard}
+                  hasCredit={!!creditCard}
+                  creditAvailable={creditAvailable}
+                  creditLimit={creditCard?.creditLimit}
                 />
               </div>
             )}
             <Button full disabled={!qty || Number(qty) <= 0 || (orderType === 'limit' && !limitPrice)} onClick={doOrder}>
-              {side === 'buy' ? 'Buy' : 'Sell'} {qty} {selected.symbol}{side === 'buy' && orderType === 'market' && source === 'card' ? ' · Credit Card' : ''}
+              {side === 'buy' ? 'Buy' : 'Sell'} {qty} {selected.symbol}{side === 'buy' && orderType === 'market' && source === 'card' ? ' · Credit Card' : side === 'buy' && orderType === 'market' && source === 'debit' ? ' · Debit Card' : ''}
             </Button>
           </div>
         )}

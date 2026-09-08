@@ -183,3 +183,9 @@ input[type="number"] { -moz-appearance: textfield; }
   -webkit-backface-visibility: hidden;
 }
 .flip-back { transform: rotateY(180deg); }
+
+/* premium card sheen */
+.shine {
+  background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.14) 38%, transparent 55%);
+  pointer-events: none;
+}

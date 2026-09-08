@@ -4,7 +4,9 @@ import type {
   ApprovalRequest,
   Card,
   FD,
+  GatewayEvent,
   GatewayOrder,
+  GatewaySettlement,
   KycDoc,
   Loan,
   Merchant,
@@ -292,6 +294,23 @@ const mapGatewayOrder = (o: any): GatewayOrder => ({
   settledAt: o.settled_at ? new Date(o.settled_at).getTime() : null,
 })
 
+const mapGatewayEvent = (e: any): GatewayEvent => ({
+  id: e.id,
+  orderId: e.order_id ?? null,
+  merchantId: e.merchant_id ?? null,
+  event: e.event,
+  meta: e.meta ?? {},
+  createdAt: new Date(e.created_at).getTime(),
+})
+
+const mapGatewaySettlement = (s: any): GatewaySettlement => ({
+  id: s.id,
+  merchantId: s.merchant_id,
+  amount: num(s.amount),
+  orders: s.orders ?? 0,
+  settledAt: new Date(s.settled_at).getTime(),
+})
+
 const mapKyc = (k: any): KycDoc => ({
   pan: k.pan ?? '',
   aadhaar_masked: k.aadhaar_masked ?? '',
@@ -358,6 +377,8 @@ interface BankState {
   stockTrades: StockTrade[]
   merchants: Merchant[]
   gatewayOrders: GatewayOrder[]
+  gatewayEvents: GatewayEvent[]
+  gatewaySettlements: GatewaySettlement[]
   kyc: KycDoc | null
   userSettings: Record<string, Record<string, any>>
   pricesUpdatedAt: number
@@ -373,9 +394,9 @@ interface BankState {
   stopRealtime: () => void
   startRealtime: () => void
 
-  transfer: (amount: number, fromUserId: string, toUserId: string, method: 'upi' | 'account', note?: string, source?: 'balance' | 'card') => Promise<Res>
+  transfer: (amount: number, fromUserId: string, toUserId: string, method: 'upi' | 'account', note?: string, source?: 'balance' | 'debit' | 'card') => Promise<Res>
   requestMoney: (fromUserId: string, toUserId: string, amount: number, note?: string) => Promise<Res>
-  respondMoneyRequest: (reqId: string, action: 'pay' | 'decline', source?: 'balance' | 'card') => Promise<Res>
+  respondMoneyRequest: (reqId: string, action: 'pay' | 'decline', source?: 'balance' | 'debit' | 'card') => Promise<Res>
   addMoneyRequest: (userId: string, amount: number, note?: string) => Promise<Res>
   withdrawRequest: (userId: string, amount: number, note?: string) => Promise<Res>
   applyLoan: (userId: string, amount: number, months: number, purpose: string) => Promise<Res>
@@ -398,21 +419,25 @@ interface BankState {
   resetBank: () => Promise<void>
 
   submitKyc: (userId: string, fields: { pan: string; dob: string; gender: string; occupation: string; incomeBand: string; address: string; city: string; state: string; pincode: string; nomineeName: string; nomineeRelation: string }) => Promise<Res>
-  mfBuy: (userId: string, fundId: string, amount: number, source?: 'balance' | 'card') => Promise<Res>
+  mfBuy: (userId: string, fundId: string, amount: number, source?: 'balance' | 'debit' | 'card') => Promise<Res>
   mfRedeem: (userId: string, fundId: string, units: number) => Promise<Res>
   mfSetupSip: (userId: string, fundId: string, amount: number, day: number) => Promise<Res>
   mfCancelSip: (userId: string, fundId: string) => Promise<Res>
   mfNavTick: () => Promise<Res>
-  stockPlaceOrder: (userId: string, stockId: string, side: 'buy' | 'sell', type: 'market' | 'limit', qty: number, limitPrice?: number, source?: 'balance' | 'card') => Promise<Res>
+  stockPlaceOrder: (userId: string, stockId: string, side: 'buy' | 'sell', type: 'market' | 'limit', qty: number, limitPrice?: number, source?: 'balance' | 'debit' | 'card') => Promise<Res>
   stockCancelOrder: (userId: string, orderId: string) => Promise<Res>
   marketTick: () => Promise<Res>
   registerMerchant: (name: string, app: string, callback: string) => Promise<Res & { merchant?: Merchant }>
-  gatewayPay: (payToken: string, userId: string, source?: 'balance' | 'card') => Promise<Res>
+  gatewayPay: (payToken: string, userId: string, source?: 'balance' | 'debit' | 'card') => Promise<Res>
   gatewayGetOrder: (payToken: string) => Promise<Res & { order?: any }>
   gatewayCreateOrder: (apiKey: string, apiSecret: string, orderRef: string, amount: number, note: string) => Promise<Res & { order?: any }>
   gatewayVerify: (apiKey: string, apiSecret: string, orderRef: string) => Promise<Res & { order?: any }>
   gatewaySettle: (merchantId: string) => Promise<Res & { amount?: number; ordersSetled?: number }>
   gatewayRefund: (orderId: string) => Promise<Res>
+  gatewayInitiate: (payToken: string, method: 'upi' | 'card', opts?: { upiId?: string; cardNumber?: string; expiry?: string; cvv?: string }) => Promise<Res & { method?: string; to?: string; expiresIn?: number }>
+  gatewayConfirm: (payToken: string, otp: string) => Promise<Res & { amount?: number; merchant?: string; orderRef?: string }>
+  merchantSetStatus: (merchantId: string, status: 'active' | 'blocked') => Promise<Res>
+  merchantRotateKeys: (merchantId: string) => Promise<Res & { apiKey?: string; apiSecret?: string }>
   refreshSkins: () => Promise<void>
   buySkin: (skinId: string) => Promise<Res>
   equipSkin: (skinId: string) => Promise<Res>
@@ -468,6 +493,8 @@ export const useBank = create<BankState>()((set, get) => ({
   stockTrades: [],
   merchants: [],
   gatewayOrders: [],
+  gatewayEvents: [],
+  gatewaySettlements: [],
   kyc: null,
   userSettings: {},
   pricesUpdatedAt: 0,
@@ -647,11 +674,18 @@ export const useBank = create<BankState>()((set, get) => ({
   refreshGateway: async () => {
     const s = get()
     if (!s.session || s.session.role !== 'admin') return
-    const [m, o] = await Promise.all([
+    const [m, o, e, st] = await Promise.all([
       supabase.from('jb_merchants').select('*').order('created_at', { ascending: false }),
       supabase.from('jb_gateway_orders').select('*').order('created_at', { ascending: false }).limit(300),
+      supabase.from('jb_gateway_events').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('jb_gateway_settlements').select('*').order('settled_at', { ascending: false }).limit(200),
     ])
-    set({ merchants: (m.data ?? []).map(mapMerchant), gatewayOrders: (o.data ?? []).map(mapGatewayOrder) })
+    set({
+      merchants: (m.data ?? []).map(mapMerchant),
+      gatewayOrders: (o.data ?? []).map(mapGatewayOrder),
+      gatewayEvents: (e.data ?? []).map(mapGatewayEvent),
+      gatewaySettlements: (st.data ?? []).map(mapGatewaySettlement),
+    })
   },
 
   refreshKyc: async () => {
@@ -720,7 +754,7 @@ export const useBank = create<BankState>()((set, get) => ({
       if (!sess && get().session) {
         get().stopRealtime()
         applyThemeSkin(null)
-        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0, skins: [], ownedSkins: [] })
+        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], gatewayEvents: [], gatewaySettlements: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0, skins: [], ownedSkins: [] })
       }
     })
     set({ booting: false })
@@ -769,7 +803,7 @@ export const useBank = create<BankState>()((set, get) => ({
     await supabase.auth.signOut()
     get().stopRealtime()
     applyThemeSkin(null)
-    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0, skins: [], ownedSkins: [] })
+    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], gatewayEvents: [], gatewaySettlements: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0, skins: [], ownedSkins: [] })
   },
 
   loadAll: async () => {
@@ -1199,6 +1233,47 @@ export const useBank = create<BankState>()((set, get) => ({
     if (!j.ok) return { ok: false, error: j.error }
     await Promise.all([get().refreshGateway(), get().refreshTxns(), get().refreshUsers()])
     return { ok: true }
+  },
+
+  gatewayInitiate: async (payToken, method, opts) => {
+    const { data, error } = await supabase.rpc('jb_gateway_initiate', {
+      p_pay_token: payToken,
+      p_method: method,
+      p_upi_id: opts?.upiId || null,
+      p_card_number: opts?.cardNumber || null,
+      p_expiry: opts?.expiry || null,
+      p_cvv: opts?.cvv || null,
+    })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    return { ok: true, method: j.method, to: j.to, expiresIn: j.expires_in }
+  },
+
+  gatewayConfirm: async (payToken, otp) => {
+    const { data, error } = await supabase.rpc('jb_gateway_confirm', { p_pay_token: payToken, p_otp: otp })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    return { ok: true, amount: j.amount, merchant: j.merchant, orderRef: j.order_ref }
+  },
+
+  merchantSetStatus: async (merchantId, status) => {
+    const { data, error } = await supabase.rpc('jb_merchant_set_status', { p_merchant: merchantId, p_status: status })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshGateway()
+    return { ok: true }
+  },
+
+  merchantRotateKeys: async (merchantId) => {
+    const { data, error } = await supabase.rpc('jb_merchant_rotate_keys', { p_merchant: merchantId })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshGateway()
+    return { ok: true, apiKey: j.api_key, apiSecret: j.api_secret }
   },
 
   /* ---------------- Per-user settings ---------------- */

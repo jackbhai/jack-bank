@@ -63,7 +63,8 @@ export default function Home() {
   const [detail, setDetail] = useState<Transaction | null>(null)
 
   const creditCard = me.cards.find((c) => c.type === 'credit' && c.status === 'active')
-  const cardAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
+  const debitCard = me.cards.find((c) => c.type === 'debit' && c.status === 'active')
+  const creditAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
 
   const doRefresh = async () => {
     setRefreshing(true)
@@ -343,9 +344,10 @@ export default function Home() {
               source={paySource}
               onChange={setPaySource}
               balance={me.balance}
-              hasCard={!!creditCard}
-              cardAvailable={cardAvailable}
-              cardLimit={creditCard?.creditLimit}
+              hasDebit={!!debitCard}
+              hasCredit={!!creditCard}
+              creditAvailable={creditAvailable}
+              creditLimit={creditCard?.creditLimit}
             />
             <PinPad onComplete={doPayRequest} />
           </div>
