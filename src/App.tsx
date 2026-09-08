@@ -30,6 +30,7 @@ const GatewayPay = lazy(() => import('./pages/user/GatewayPay'))
 const AdminDash = lazy(() => import('./pages/admin/Dashboard'))
 const AdminApprovals = lazy(() => import('./pages/admin/Approvals'))
 const AdminUsers = lazy(() => import('./pages/admin/Users'))
+const AdminUserDetail = lazy(() => import('./pages/admin/UserDetail'))
 const AdminRules = lazy(() => import('./pages/admin/Rules'))
 const AdminLedger = lazy(() => import('./pages/admin/Ledger'))
 const AdminGateway = lazy(() => import('./pages/admin/Gateway'))
@@ -121,6 +122,7 @@ export default function App() {
             <Route index element={<AdminDash />} />
             <Route path="approvals" element={<AdminApprovals />} />
             <Route path="users" element={<AdminUsers />} />
+            <Route path="users/:id" element={<AdminUserDetail />} />
             <Route path="rules" element={<AdminRules />} />
             <Route path="ledger" element={<AdminLedger />} />
             <Route path="gateway" element={<AdminGateway />} />

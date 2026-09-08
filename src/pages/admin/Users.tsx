@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
-import { Search, Ban, CircleCheck, MinusCircle, PlusCircle, CreditCard, Landmark, IdCard, UserPlus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Search, Ban, CircleCheck, MinusCircle, PlusCircle, CreditCard, Landmark, IdCard, UserPlus, ChevronRight } from 'lucide-react'
 import { useBank, useToast } from '../../store'
 import { fmtDate, inr } from '../../lib/utils'
 import { Avatar, Modal, Button, Field, inputCls, Sheet } from '../../components/ui'
 import type { User } from '../../lib/types'
 
 export default function Users() {
+  const nav = useNavigate()
   const toast = useToast((s) => s.toast)
   const users = useBank((s) => s.users)
   const loans = useBank((s) => s.loans)
@@ -57,7 +59,7 @@ export default function Users() {
 
       <div className="mt-4 flex flex-col gap-2.5">
         {filtered.map((u) => (
-          <button key={u.id} onClick={() => setSelected(u)} className="card p-3.5 flex items-center gap-3 text-left active:scale-[0.98]">
+          <button key={u.id} onClick={() => nav(`/admin/users/${u.id}`)} className="card p-3.5 flex items-center gap-3 text-left active:scale-[0.98]">
             <Avatar name={u.name} hue={u.avatarHue} size={44} />
             <div className="flex-1 min-w-0">
               <p className="text-[14px] font-semibold text-text truncate">{u.name}</p>
@@ -76,6 +78,7 @@ export default function Users() {
                 )}
               </div>
             </div>
+            <ChevronRight size={16} className="text-faint shrink-0" />
           </button>
         ))}
       </div>

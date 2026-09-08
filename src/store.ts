@@ -27,6 +27,7 @@ import type {
 import { DEFAULT_SETTINGS } from './lib/seed'
 import { uid } from './lib/utils'
 import { fxSuccess, fxError, fxTap } from './lib/fx'
+import { DEFAULT_USER_CFG } from './lib/userCfg'
 
 export interface Announcement {
   id: string
@@ -204,6 +205,7 @@ const mapStock = (s: any): Stock => ({
   symbol: s.symbol,
   name: s.name,
   sector: s.sector,
+  kind: s.kind ?? 'equity',
   price: num(s.price),
   prevClose: num(s.prev_close),
   dayOpen: num(s.day_open),
@@ -343,6 +345,7 @@ interface BankState {
   merchants: Merchant[]
   gatewayOrders: GatewayOrder[]
   kyc: KycDoc | null
+  userSettings: Record<string, Record<string, any>>
 
   init: () => Promise<void>
   login: (email: string, password: string) => Promise<Res & { role?: string }>
@@ -389,8 +392,16 @@ interface BankState {
   registerMerchant: (name: string, app: string, callback: string) => Promise<Res & { merchant?: Merchant }>
   gatewayPay: (payToken: string, userId: string) => Promise<Res>
   gatewayGetOrder: (payToken: string) => Promise<Res & { order?: any }>
+  gatewayCreateOrder: (apiKey: string, apiSecret: string, orderRef: string, amount: number, note: string) => Promise<Res & { order?: any }>
   gatewayVerify: (apiKey: string, apiSecret: string, orderRef: string) => Promise<Res & { order?: any }>
   gatewaySettle: (merchantId: string) => Promise<Res>
+  getUserSettings: (userId: string) => Promise<Record<string, any>>
+  setUserSetting: (userId: string, key: string, value: any) => Promise<Res>
+  adminResetPin: (userId: string, pin: string) => Promise<Res>
+  adminIssueCard: (userId: string, type: 'debit' | 'credit', limit?: number) => Promise<Res & { card?: any }>
+  adminSetCardLimit: (cardId: string, limit: number) => Promise<Res>
+  adminApproveKyc: (userId: string) => Promise<Res>
+  adminDeleteUser: (userId: string) => Promise<Res>
 
   refreshUsers: () => Promise<void>
   refreshTxns: () => Promise<void>
@@ -433,6 +444,7 @@ export const useBank = create<BankState>()((set, get) => ({
   merchants: [],
   gatewayOrders: [],
   kyc: null,
+  userSettings: {},
 
   /* ---------------- loaders ---------------- */
   refreshUsers: async () => {
@@ -632,7 +644,7 @@ export const useBank = create<BankState>()((set, get) => ({
     supabase.auth.onAuthStateChange((_e, sess) => {
       if (!sess && get().session) {
         get().stopRealtime()
-        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null })
+        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {} })
       }
     })
     set({ booting: false })
@@ -680,7 +692,7 @@ export const useBank = create<BankState>()((set, get) => ({
   logout: async () => {
     await supabase.auth.signOut()
     get().stopRealtime()
-    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null })
+    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null, userSettings: {} })
   },
 
   loadAll: async () => {
@@ -1050,6 +1062,16 @@ export const useBank = create<BankState>()((set, get) => ({
     if (!j.ok) return { ok: false, error: j.error }
     return { ok: true, order: j.order }
   },
+  gatewayCreateOrder: async (apiKey, apiSecret, orderRef, amount, note) => {
+    const { data, error } = await supabase.rpc('jb_gateway_create_order', {
+      p_api_key: apiKey, p_api_secret: apiSecret, p_order_ref: orderRef, p_amount: amount, p_note: note || null,
+    })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshGateway()
+    return { ok: true, order: j.order }
+  },
   gatewayVerify: async (apiKey, apiSecret, orderRef) => {
     const { data, error } = await supabase.rpc('jb_gateway_verify', { p_api_key: apiKey, p_api_secret: apiSecret, p_order_ref: orderRef })
     if (error) return { ok: false, error: error.message }
@@ -1064,6 +1086,67 @@ export const useBank = create<BankState>()((set, get) => ({
     if (!j.ok) return { ok: false, error: j.error }
     await get().refreshGateway()
     return { ok: true, amount: j.amount }
+  },
+
+  /* ---------------- Per-user settings ---------------- */
+  getUserSettings: async (userId) => {
+    const { data, error } = await supabase.rpc('jb_user_settings_get', { p_user: userId })
+    if (error) return { ...DEFAULT_USER_CFG }
+    const stored = (data ?? {}) as Record<string, any>
+    const merged = { ...DEFAULT_USER_CFG, ...stored }
+    set((s) => ({ userSettings: { ...s.userSettings, [userId]: merged } }))
+    return merged
+  },
+  setUserSetting: async (userId, key, value) => {
+    const { data, error } = await supabase.rpc('jb_user_set_setting', { p_user: userId, p_key: key, p_value: value })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    set((s) => ({
+      userSettings: { ...s.userSettings, [userId]: { ...(s.userSettings[userId] || {}), [key]: value } },
+    }))
+    return { ok: true }
+  },
+
+  /* ---------------- Admin management ---------------- */
+  adminResetPin: async (userId, pin) => {
+    const { data, error } = await supabase.rpc('jb_admin_reset_pin', { p_user: userId, p_pin: pin })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    return { ok: true }
+  },
+  adminIssueCard: async (userId, type, limit) => {
+    const { data, error } = await supabase.rpc('jb_admin_issue_card', { p_user: userId, p_type: type, p_limit: limit || null })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshCards()
+    return { ok: true, card: j }
+  },
+  adminSetCardLimit: async (cardId, limit) => {
+    const { data, error } = await supabase.rpc('jb_admin_set_card_limit', { p_card: cardId, p_limit: limit })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshCards()
+    return { ok: true }
+  },
+  adminApproveKyc: async (userId) => {
+    const { data, error } = await supabase.rpc('jb_admin_approve_kyc', { p_user: userId })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await Promise.all([get().refreshUsers(), get().refreshRequests()])
+    return { ok: true }
+  },
+  adminDeleteUser: async (userId) => {
+    const { data, error } = await supabase.rpc('jb_admin_delete_user', { p_user: userId })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshUsers()
+    return { ok: true }
   },
 }))
 

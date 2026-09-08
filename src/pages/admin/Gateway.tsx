@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Store, Copy, Check, Plus, Globe, KeyRound, Wallet, ArrowDownToLine, Terminal, X } from 'lucide-react'
+import { Store, Copy, Check, Plus, Globe, KeyRound, Wallet, ArrowDownToLine, Terminal, X, PlayCircle, ReceiptText, TrendingUp } from 'lucide-react'
 import { useBank, useToast } from '../../store'
 import { inr, fmtDateTime } from '../../lib/utils'
 import type { Merchant } from '../../lib/types'
@@ -12,6 +12,7 @@ export default function Gateway() {
   const users = useBank((s) => s.users)
   const registerMerchant = useBank((s) => s.registerMerchant)
   const gatewaySettle = useBank((s) => s.gatewaySettle)
+  const gatewayCreateOrder = useBank((s) => s.gatewayCreateOrder)
 
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -20,6 +21,10 @@ export default function Gateway() {
   const [created, setCreated] = useState<Merchant | null>(null)
   const [copied, setCopied] = useState('')
   const [docs, setDocs] = useState(false)
+  const [testOpen, setTestOpen] = useState<Merchant | null>(null)
+  const [testAmt, setTestAmt] = useState('100')
+  const [testRef, setTestRef] = useState('TEST-' + Date.now().toString().slice(-6))
+  const [testNote, setTestNote] = useState('Test purchase')
 
   const copy = async (v: string, label: string) => {
     try {
@@ -52,6 +57,21 @@ export default function Gateway() {
         </div>
       </div>
 
+      <div className="grid grid-cols-3 gap-2 mt-3">
+        <div className="card p-3">
+          <p className="text-[10px] text-muted uppercase tracking-wide">Total orders</p>
+          <p className="text-[16px] font-bold text-text mt-0.5">{orders.length}</p>
+        </div>
+        <div className="card p-3">
+          <p className="text-[10px] text-muted uppercase tracking-wide flex items-center gap-1"><TrendingUp size={11} /> Revenue</p>
+          <p className="text-[16px] font-bold text-success mt-0.5">{inr(orders.filter((o) => o.status === 'paid').reduce((a, o) => a + o.amount, 0))}</p>
+        </div>
+        <div className="card p-3">
+          <p className="text-[10px] text-muted uppercase tracking-wide">Paid / pending</p>
+          <p className="text-[16px] font-bold text-text mt-0.5">{orders.filter((o) => o.status === 'paid').length} / {orders.filter((o) => o.status === 'pending').length}</p>
+        </div>
+      </div>
+
       <div className="mt-5">
         <p className="text-[13px] font-bold text-text mb-2">Merchant apps</p>
         {merchants.length === 0 && <p className="text-center text-[13px] text-muted py-8">No merchant apps yet. Register one to accept payments.</p>}
@@ -69,9 +89,17 @@ export default function Gateway() {
                 <span className="text-[10px] font-bold text-muted bg-surface2 px-2 py-0.5 rounded-md uppercase">{m.callbackUrl ? 'webhook' : 'polling'}</span>
               </div>
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-line">
-                <button onClick={() => copy(m.apiKey, 'key' + m.id)} className="flex items-center gap-1.5 text-[11.5px] font-mono text-muted max-w-[60%] truncate">
-                  <KeyRound size={12} /> {m.apiKey.slice(0, 14)}…
+                <button onClick={() => copy(m.apiKey, 'key' + m.id)} className="flex items-center gap-1.5 text-[11.5px] font-mono text-muted max-w-[50%] truncate">
+                  <KeyRound size={12} /> {m.apiKey.slice(0, 12)}…
                 </button>
+                <button onClick={() => { setTestAmt('100'); setTestRef('TEST-' + Date.now().toString().slice(-6)); setTestNote('Test purchase'); setTestOpen(m) }} className="flex items-center gap-1 text-[11.5px] font-bold text-accent bg-accent/12 px-2.5 py-1.5 rounded-lg">
+                  <PlayCircle size={13} /> Test pay
+                </button>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[12px] text-muted flex items-center gap-1">
+                  <ReceiptText size={12} /> {orders.filter((o) => o.merchantId === m.id).length} orders · revenue <span className="font-bold text-text">{inr(orders.filter((o) => o.merchantId === m.id && o.status === 'paid').reduce((a, o) => a + o.amount, 0))}</span>
+                </span>
                 <div className="flex items-center gap-2">
                   <span className="text-[12px] text-muted">Unsettled <span className="font-bold text-text">{inr(m.settlement)}</span></span>
                   <button
@@ -155,6 +183,34 @@ export default function Gateway() {
               </button>
             </div>
             <Button full onClick={() => { setOpen(false); setCreated(null) }}>Done</Button>
+          </div>
+        )}
+      </Sheet>
+
+      {/* test payment */}
+      <Sheet open={!!testOpen} onClose={() => setTestOpen(null)} title="Test payment">
+        {testOpen && (
+          <div className="pt-1 flex flex-col gap-3">
+            <p className="text-[12.5px] text-muted">Simulate a purchase from <span className="font-semibold text-text">{testOpen.name}</span>. This creates a real gateway order and opens the pay page.</p>
+            <Field label="Amount">
+              <input type="number" inputMode="decimal" value={testAmt} onChange={(e) => setTestAmt(e.target.value)} className={inputCls} />
+            </Field>
+            <Field label="Order reference">
+              <input value={testRef} onChange={(e) => setTestRef(e.target.value)} className={inputCls} />
+            </Field>
+            <Field label="Note">
+              <input value={testNote} onChange={(e) => setTestNote(e.target.value)} className={inputCls} />
+            </Field>
+            <Button full disabled={!testAmt || Number(testAmt) <= 0} onClick={async () => {
+              const res = await gatewayCreateOrder(testOpen.apiKey, testOpen.apiSecret, testRef, Number(testAmt), testNote)
+              if (res.ok && res.order) {
+                toast('Order created — opening pay page', 'success')
+                setTestOpen(null)
+                window.location.hash = '#/gateway/' + res.order.pay_token
+              } else toast(res.error || 'Failed', 'error')
+            }}>
+              <PlayCircle size={16} /> Create order & pay
+            </Button>
           </div>
         )}
       </Sheet>

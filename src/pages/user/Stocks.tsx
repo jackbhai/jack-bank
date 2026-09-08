@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, TrendingUp, TrendingDown, RefreshCw, LineChart, Clock, XCircle, CheckCircle2 } from 'lucide-react'
+import { ChevronLeft, TrendingUp, TrendingDown, RefreshCw, LineChart, Clock, XCircle, CheckCircle2, Bitcoin } from 'lucide-react'
 import { useBank, useToast } from '../../store'
 import { inr, fmtTime } from '../../lib/utils'
-import { pct, upDown, spark, fmtVol, fmtCr } from '../../lib/market'
+import { pct, upDown, spark, fmtVol, fmtCr, chartSeries, type ChartRange } from '../../lib/market'
 import type { Stock, StockHolding } from '../../lib/types'
 import { Button, Field, Segmented, Sheet, TopBar, inputCls } from '../../components/ui'
 
@@ -24,12 +24,16 @@ export default function Stocks() {
   const myOrders = orders.filter((o) => o.userId === me.id).sort((a, b) => b.createdAt - a.createdAt)
 
   const [tab, setTab] = useState<'market' | 'holdings' | 'orders'>('market')
+  const [kind, setKind] = useState<'equity' | 'crypto'>('equity')
+  const [range, setRange] = useState<ChartRange>('Live')
   const [selected, setSelected] = useState<Stock | null>(null)
   const [tradeOpen, setTradeOpen] = useState(false)
   const [side, setSide] = useState<'buy' | 'sell'>('buy')
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market')
   const [qty, setQty] = useState('')
   const [limitPrice, setLimitPrice] = useState('')
+
+  const listStocks = useMemo(() => stocks.filter((s) => s.kind === kind), [stocks, kind])
 
   const invested = myHoldings.reduce((a, h) => {
     const s = stocks.find((x) => x.id === h.stockId)
@@ -98,7 +102,16 @@ export default function Stocks() {
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 flex items-center gap-2">
+        <button onClick={() => setKind('equity')} className={`flex-1 py-2 rounded-xl text-[12.5px] font-bold border transition-all ${kind === 'equity' ? 'bg-primary/12 border-primary text-primary' : 'border-line text-muted'}`}>
+          Equities · {stocks.filter((s) => s.kind === 'equity').length}
+        </button>
+        <button onClick={() => setKind('crypto')} className={`flex-1 py-2 rounded-xl text-[12.5px] font-bold border transition-all flex items-center justify-center gap-1.5 ${kind === 'crypto' ? 'bg-warning/12 border-warning text-warning' : 'border-line text-muted'}`}>
+          <Bitcoin size={15} /> Crypto · {stocks.filter((s) => s.kind === 'crypto').length}
+        </button>
+      </div>
+
+      <div className="mt-3">
         <Segmented
           options={[
             { id: 'market', label: 'Market' },
@@ -112,7 +125,7 @@ export default function Stocks() {
 
       {tab === 'market' && (
         <div className="mt-3 flex flex-col gap-2.5 pb-2">
-          {stocks.map((s) => {
+          {listStocks.map((s) => {
             const d = pct(s.price, s.prevClose)
             const ud = upDown(d)
             const sp = spark(s.history, 90, 32)
@@ -152,8 +165,10 @@ export default function Stocks() {
 
       {tab === 'holdings' && (
         <div className="mt-3 flex flex-col gap-2.5 pb-2">
-          {myHoldings.length === 0 && <p className="text-center text-[13px] text-muted py-10">No holdings yet. Buy your first stock!</p>}
-          {myHoldings.map((h) => {
+          {myHoldings.filter((h) => stocks.find((x) => x.id === h.stockId)?.kind === kind).length === 0 && (
+            <p className="text-center text-[13px] text-muted py-10">{kind === 'crypto' ? 'No crypto holdings yet.' : 'No holdings yet. Buy your first stock!'}</p>
+          )}
+          {myHoldings.filter((h) => stocks.find((x) => x.id === h.stockId)?.kind === kind).map((h) => {
             const s = stocks.find((x) => x.id === h.stockId)
             if (!s) return null
             const val = h.qty * s.price
@@ -184,8 +199,10 @@ export default function Stocks() {
 
       {tab === 'orders' && (
         <div className="mt-3 flex flex-col gap-2.5 pb-2">
-          {myOrders.length === 0 && <p className="text-center text-[13px] text-muted py-10">No orders yet</p>}
-          {myOrders.map((o) => {
+          {myOrders.filter((o) => stocks.find((x) => x.id === o.stockId)?.kind === kind).length === 0 && (
+            <p className="text-center text-[13px] text-muted py-10">No orders yet</p>
+          )}
+          {myOrders.filter((o) => stocks.find((x) => x.id === o.stockId)?.kind === kind).map((o) => {
             const s = stocks.find((x) => x.id === o.stockId)
             return (
               <div key={o.id} className="card p-4">
@@ -226,7 +243,8 @@ export default function Stocks() {
         {detail && (() => {
           const d = pct(detail.price, detail.prevClose)
           const ud = upDown(d)
-          const sp = spark(detail.history, 300, 90)
+          const series = chartSeries(detail.symbol, range, detail.price, detail.history)
+          const sp = spark(series, 300, 90)
           return (
             <div className="pt-1 flex flex-col gap-4">
               <div className="flex items-start justify-between">
@@ -243,7 +261,15 @@ export default function Stocks() {
                 </span>
               </div>
 
-              <svg viewBox="0 0 300 90" className="w-full h-24 rounded-xl bg-surface2">
+              <div className="flex gap-1">
+                {(['Live', '1D', '1W', '1M', '1Y'] as ChartRange[]).map((r) => (
+                  <button key={r} onClick={() => setRange(r)} className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${range === r ? 'bg-primary/12 text-primary' : 'text-muted'}`}>
+                    {r}
+                  </button>
+                ))}
+              </div>
+
+              <svg viewBox="0 0 300 90" className="w-full h-28 rounded-xl bg-surface2">
                 {sp.line && (
                   <>
                     <path d={sp.area} fill={d >= 0 ? 'rgba(52,211,153,0.14)' : 'rgba(251,113,133,0.14)'} />
@@ -251,6 +277,11 @@ export default function Stocks() {
                   </>
                 )}
               </svg>
+              <div className="flex justify-between text-[10px] text-faint -mt-1">
+                <span>open</span>
+                <span>{range} price action</span>
+                <span>now</span>
+              </div>
 
               <div className="grid grid-cols-3 gap-2">
                 <Stat label="Open" value={`₹${detail.dayOpen ? detail.dayOpen.toFixed(2) : '—'}`} />

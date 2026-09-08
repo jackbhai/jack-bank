@@ -209,6 +209,7 @@ export interface Stock {
   symbol: string
   name: string
   sector: string
+  kind: 'equity' | 'crypto'
   price: number
   prevClose: number
   dayOpen: number
