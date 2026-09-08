@@ -33,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
   savingsInterestRate: 3.5,
   fdInterestRate: 7,
   defaultCreditLimit: 50000,
+  gatewayFeePct: 1.5,
 }
 
 const ADMIN_ID = 'admin'

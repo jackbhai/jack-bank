@@ -108,6 +108,17 @@ export default function Settings() {
         </div>
       </div>
 
+      <div className="mt-6 card p-4 border-warning/30">
+        <p className="text-[11px] font-bold text-warning uppercase tracking-wide mb-1.5">Important disclaimer</p>
+        <p className="text-[12px] text-muted leading-relaxed">
+          Jack Bank is a <span className="font-semibold text-text">simulation only</span>. It is not a real bank, not a real
+          payment gateway, and is not affiliated with any real financial institution. No real-life bank, real money, real
+          UPI, real KYC, or real investments are involved. All balances, transactions, loans, deposits, funds, stocks and
+          payments are virtual and for entertainment &amp; learning purposes only. Do not enter real bank details, PAN,
+          Aadhaar or passwords anywhere in this app.
+        </p>
+      </div>
+
       <Sheet open={pinOpen} onClose={() => setPinOpen(false)} title="Change PIN">
         <div className="pt-3">
           <p className="text-center text-[12.5px] text-muted mb-4">Enter a new 4-digit PIN</p>

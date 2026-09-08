@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom'
-import { LayoutDashboard, ClipboardCheck, Users, SlidersHorizontal, ScrollText } from 'lucide-react'
+import { LayoutDashboard, ClipboardCheck, Users, SlidersHorizontal, ScrollText, Globe, LineChart } from 'lucide-react'
 import { BottomNav } from './ui'
 
 const items = [
@@ -8,6 +8,8 @@ const items = [
   { to: '/admin/users', icon: Users, label: 'Users' },
   { to: '/admin/rules', icon: SlidersHorizontal, label: 'Rules' },
   { to: '/admin/ledger', icon: ScrollText, label: 'Ledger' },
+  { to: '/admin/gateway', icon: Globe, label: 'Gateway' },
+  { to: '/admin/markets', icon: LineChart, label: 'Markets' },
 ]
 
 export default function AdminLayout() {

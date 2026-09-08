@@ -24,11 +24,16 @@ const Loans = lazy(() => import('./pages/user/Loans'))
 const FD = lazy(() => import('./pages/user/FD'))
 const Settings = lazy(() => import('./pages/user/Settings'))
 const Notifications = lazy(() => import('./pages/user/Notifications'))
+const MutualFunds = lazy(() => import('./pages/user/MutualFunds'))
+const Stocks = lazy(() => import('./pages/user/Stocks'))
+const GatewayPay = lazy(() => import('./pages/user/GatewayPay'))
 const AdminDash = lazy(() => import('./pages/admin/Dashboard'))
 const AdminApprovals = lazy(() => import('./pages/admin/Approvals'))
 const AdminUsers = lazy(() => import('./pages/admin/Users'))
 const AdminRules = lazy(() => import('./pages/admin/Rules'))
 const AdminLedger = lazy(() => import('./pages/admin/Ledger'))
+const AdminGateway = lazy(() => import('./pages/admin/Gateway'))
+const AdminMarkets = lazy(() => import('./pages/admin/Markets'))
 
 function PageFallback() {
   return (
@@ -76,6 +81,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/gateway/:token" element={<GatewayPay />} />
 
           <Route
             path="/"
@@ -98,6 +104,8 @@ export default function App() {
             <Route path="profile" element={<Profile />} />
             <Route path="loans" element={<Loans />} />
             <Route path="fd" element={<FD />} />
+            <Route path="mf" element={<MutualFunds />} />
+            <Route path="stocks" element={<Stocks />} />
             <Route path="settings" element={<Settings />} />
             <Route path="notifications" element={<Notifications />} />
           </Route>
@@ -115,6 +123,8 @@ export default function App() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="rules" element={<AdminRules />} />
             <Route path="ledger" element={<AdminLedger />} />
+            <Route path="gateway" element={<AdminGateway />} />
+            <Route path="markets" element={<AdminMarkets />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

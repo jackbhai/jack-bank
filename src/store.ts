@@ -4,12 +4,22 @@ import type {
   ApprovalRequest,
   Card,
   FD,
+  GatewayOrder,
+  KycDoc,
   Loan,
+  Merchant,
+  MfFund,
+  MfHolding,
+  MfTxn,
   MoneyRequest,
   Notif,
   Res,
   Session,
   Settings,
+  Stock,
+  StockHolding,
+  StockOrder,
+  StockTrade,
   Theme,
   Transaction,
   User,
@@ -148,6 +158,140 @@ const mapAnn = (a: any): Announcement => ({
   createdAt: new Date(a.created_at).getTime(),
 })
 
+const mapMfFund = (f: any): MfFund => ({
+  id: f.id,
+  code: f.code,
+  name: f.name,
+  fundHouse: f.fund_house,
+  category: f.category,
+  risk: f.risk ?? 'Moderate',
+  nav: num(f.nav),
+  prevNav: num(f.prev_nav),
+  aum: num(f.aum),
+  expenseRatio: num(f.expense_ratio),
+  minLumpsum: num(f.min_lumpsum),
+  minSip: num(f.min_sip),
+  ret1y: num(f.ret_1y),
+  ret3y: num(f.ret_3y),
+  description: f.description ?? '',
+})
+
+const mapMfHolding = (h: any): MfHolding => ({
+  id: h.id,
+  userId: h.user_id,
+  fundId: h.fund_id,
+  units: num(h.units),
+  invested: num(h.invested),
+  avgNav: num(h.avg_nav),
+  sipActive: h.sip_active ?? false,
+  sipAmount: h.sip_amount == null ? null : num(h.sip_amount),
+  sipDay: h.sip_day ?? null,
+})
+
+const mapMfTxn = (t: any): MfTxn => ({
+  id: t.id,
+  userId: t.user_id,
+  fundId: t.fund_id,
+  kind: t.kind,
+  units: num(t.units),
+  nav: num(t.nav),
+  amount: num(t.amount),
+  createdAt: new Date(t.created_at).getTime(),
+})
+
+const mapStock = (s: any): Stock => ({
+  id: s.id,
+  symbol: s.symbol,
+  name: s.name,
+  sector: s.sector,
+  price: num(s.price),
+  prevClose: num(s.prev_close),
+  dayOpen: num(s.day_open),
+  dayHigh: num(s.day_high),
+  dayLow: num(s.day_low),
+  volume: num(s.volume),
+  marketCap: num(s.market_cap),
+  pe: num(s.pe),
+  high52w: num(s.high_52w),
+  low52w: num(s.low_52w),
+  history: Array.isArray(s.history) ? s.history.map((p: any) => ({ t: Number(p.t), p: num(p.p) })) : [],
+})
+
+const mapStockOrder = (o: any): StockOrder => ({
+  id: o.id,
+  userId: o.user_id,
+  stockId: o.stock_id,
+  side: o.side,
+  type: o.type,
+  qty: o.qty,
+  limitPrice: o.limit_price == null ? null : num(o.limit_price),
+  status: o.status,
+  filledQty: o.filled_qty ?? 0,
+  avgPrice: num(o.avg_price),
+  createdAt: new Date(o.created_at).getTime(),
+})
+
+const mapStockHolding = (h: any): StockHolding => ({
+  id: h.id,
+  userId: h.user_id,
+  stockId: h.stock_id,
+  qty: h.qty,
+  avgPrice: num(h.avg_price),
+})
+
+const mapStockTrade = (t: any): StockTrade => ({
+  id: t.id,
+  userId: t.user_id,
+  stockId: t.stock_id,
+  side: t.side,
+  qty: t.qty,
+  price: num(t.price),
+  amount: num(t.amount),
+  createdAt: new Date(t.created_at).getTime(),
+})
+
+const mapMerchant = (m: any): Merchant => ({
+  id: m.id,
+  name: m.name,
+  appName: m.app_name,
+  callbackUrl: m.callback_url ?? null,
+  apiKey: m.api_key,
+  apiSecret: m.api_secret,
+  settlement: num(m.settlement),
+  status: m.status,
+  createdAt: new Date(m.created_at).getTime(),
+})
+
+const mapGatewayOrder = (o: any): GatewayOrder => ({
+  id: o.id,
+  merchantId: o.merchant_id,
+  orderRef: o.order_ref,
+  amount: num(o.amount),
+  currency: o.currency ?? 'INR',
+  note: o.note ?? null,
+  status: o.status,
+  payerId: o.payer_id ?? null,
+  payToken: o.pay_token,
+  createdAt: new Date(o.created_at).getTime(),
+  paidAt: o.paid_at ? new Date(o.paid_at).getTime() : null,
+})
+
+const mapKyc = (k: any): KycDoc => ({
+  pan: k.pan ?? '',
+  aadhaar_masked: k.aadhaar_masked ?? '',
+  dob: k.dob ?? '',
+  gender: k.gender ?? '',
+  occupation: k.occupation ?? '',
+  income_band: k.income_band ?? '',
+  address: k.address ?? '',
+  city: k.city ?? '',
+  state: k.state ?? '',
+  pincode: k.pincode ?? '',
+  nominee_name: k.nominee_name ?? '',
+  nominee_relation: k.nominee_relation ?? '',
+  status: k.status ?? 'pending',
+})
+
 const mapSettings = (s: any): Settings => ({
   bankName: s.bank_name,
   upiDomain: s.upi_domain,
@@ -170,6 +314,7 @@ const mapSettings = (s: any): Settings => ({
   savingsInterestRate: num(s.savings_interest_rate),
   fdInterestRate: num(s.fd_interest_rate),
   defaultCreditLimit: num(s.default_credit_limit),
+  gatewayFeePct: num(s.gateway_fee_pct),
 })
 
 /* ---------- store ---------- */
@@ -188,6 +333,16 @@ interface BankState {
   moneyRequests: MoneyRequest[]
   notifications: Notif[]
   announcements: Announcement[]
+  mfFunds: MfFund[]
+  mfHoldings: MfHolding[]
+  mfTxns: MfTxn[]
+  stocks: Stock[]
+  stockOrders: StockOrder[]
+  stockHoldings: StockHolding[]
+  stockTrades: StockTrade[]
+  merchants: Merchant[]
+  gatewayOrders: GatewayOrder[]
+  kyc: KycDoc | null
 
   init: () => Promise<void>
   login: (email: string, password: string) => Promise<Res & { role?: string }>
@@ -222,6 +377,21 @@ interface BankState {
   markNotifsRead: (userId: string) => Promise<void>
   resetBank: () => Promise<void>
 
+  submitKyc: (userId: string, fields: { pan: string; dob: string; gender: string; occupation: string; incomeBand: string; address: string; city: string; state: string; pincode: string; nomineeName: string; nomineeRelation: string }) => Promise<Res>
+  mfBuy: (userId: string, fundId: string, amount: number) => Promise<Res>
+  mfRedeem: (userId: string, fundId: string, units: number) => Promise<Res>
+  mfSetupSip: (userId: string, fundId: string, amount: number, day: number) => Promise<Res>
+  mfCancelSip: (userId: string, fundId: string) => Promise<Res>
+  mfNavTick: () => Promise<Res>
+  stockPlaceOrder: (userId: string, stockId: string, side: 'buy' | 'sell', type: 'market' | 'limit', qty: number, limitPrice?: number) => Promise<Res>
+  stockCancelOrder: (userId: string, orderId: string) => Promise<Res>
+  marketTick: () => Promise<Res>
+  registerMerchant: (name: string, app: string, callback: string) => Promise<Res & { merchant?: Merchant }>
+  gatewayPay: (payToken: string, userId: string) => Promise<Res>
+  gatewayGetOrder: (payToken: string) => Promise<Res & { order?: any }>
+  gatewayVerify: (apiKey: string, apiSecret: string, orderRef: string) => Promise<Res & { order?: any }>
+  gatewaySettle: (merchantId: string) => Promise<Res>
+
   refreshUsers: () => Promise<void>
   refreshTxns: () => Promise<void>
   refreshCards: () => Promise<void>
@@ -231,6 +401,9 @@ interface BankState {
   refreshMoneyRequests: () => Promise<void>
   refreshNotifs: () => Promise<void>
   refreshAnnouncements: () => Promise<void>
+  refreshMarket: () => Promise<void>
+  refreshGateway: () => Promise<void>
+  refreshKyc: () => Promise<void>
 }
 
 let realtime: ReturnType<typeof supabase.channel> | null = null
@@ -250,6 +423,16 @@ export const useBank = create<BankState>()((set, get) => ({
   moneyRequests: [],
   notifications: [],
   announcements: [],
+  mfFunds: [],
+  mfHoldings: [],
+  mfTxns: [],
+  stocks: [],
+  stockOrders: [],
+  stockHoldings: [],
+  stockTrades: [],
+  merchants: [],
+  gatewayOrders: [],
+  kyc: null,
 
   /* ---------------- loaders ---------------- */
   refreshUsers: async () => {
@@ -374,6 +557,61 @@ export const useBank = create<BankState>()((set, get) => ({
     set({ announcements: (data ?? []).map(mapAnn) })
   },
 
+  refreshMarket: async () => {
+    const s = get()
+    if (!s.session) return
+    const fundQ = supabase.from('jb_mf_funds').select('*').order('name')
+    const stockQ = supabase.from('jb_stocks').select('*').order('name')
+    const [funds, stocks] = await Promise.all([fundQ, stockQ])
+    if (funds.data) set({ mfFunds: funds.data.map(mapMfFund) })
+    if (stocks.data) set({ stocks: stocks.data.map(mapStock) })
+    const holdQ =
+      s.session.role === 'admin'
+        ? supabase.from('jb_mf_holdings').select('*')
+        : supabase.from('jb_mf_holdings').select('*').eq('user_id', s.session.userId)
+    const mfTxnQ =
+      s.session.role === 'admin'
+        ? supabase.from('jb_mf_txns').select('*').order('created_at', { ascending: false }).limit(400)
+        : supabase.from('jb_mf_txns').select('*').eq('user_id', s.session.userId).order('created_at', { ascending: false }).limit(200)
+    const orderQ =
+      s.session.role === 'admin'
+        ? supabase.from('jb_stock_orders').select('*').order('created_at', { ascending: false }).limit(400)
+        : supabase.from('jb_stock_orders').select('*').eq('user_id', s.session.userId).order('created_at', { ascending: false }).limit(200)
+    const shQ =
+      s.session.role === 'admin'
+        ? supabase.from('jb_stock_holdings').select('*')
+        : supabase.from('jb_stock_holdings').select('*').eq('user_id', s.session.userId)
+    const stQ =
+      s.session.role === 'admin'
+        ? supabase.from('jb_stock_trades').select('*').order('created_at', { ascending: false }).limit(400)
+        : supabase.from('jb_stock_trades').select('*').eq('user_id', s.session.userId).order('created_at', { ascending: false }).limit(200)
+    const [holds, mfTxns, orders, sHolds, trades] = await Promise.all([holdQ, mfTxnQ, orderQ, shQ, stQ])
+    set({
+      mfHoldings: (holds.data ?? []).map(mapMfHolding),
+      mfTxns: (mfTxns.data ?? []).map(mapMfTxn),
+      stockOrders: (orders.data ?? []).map(mapStockOrder),
+      stockHoldings: (sHolds.data ?? []).map(mapStockHolding),
+      stockTrades: (trades.data ?? []).map(mapStockTrade),
+    })
+  },
+
+  refreshGateway: async () => {
+    const s = get()
+    if (!s.session || s.session.role !== 'admin') return
+    const [m, o] = await Promise.all([
+      supabase.from('jb_merchants').select('*').order('created_at', { ascending: false }),
+      supabase.from('jb_gateway_orders').select('*').order('created_at', { ascending: false }).limit(300),
+    ])
+    set({ merchants: (m.data ?? []).map(mapMerchant), gatewayOrders: (o.data ?? []).map(mapGatewayOrder) })
+  },
+
+  refreshKyc: async () => {
+    const s = get()
+    if (!s.session) return
+    const { data } = await supabase.from('jb_kyc').select('*').eq('user_id', s.session.userId).maybeSingle()
+    set({ kyc: data ? mapKyc(data) : null })
+  },
+
   init: async () => {
     // public directory for login screen
     try {
@@ -394,7 +632,7 @@ export const useBank = create<BankState>()((set, get) => ({
     supabase.auth.onAuthStateChange((_e, sess) => {
       if (!sess && get().session) {
         get().stopRealtime()
-        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [] })
+        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null })
       }
     })
     set({ booting: false })
@@ -442,7 +680,7 @@ export const useBank = create<BankState>()((set, get) => ({
   logout: async () => {
     await supabase.auth.signOut()
     get().stopRealtime()
-    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [] })
+    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], kyc: null })
   },
 
   loadAll: async () => {
@@ -454,7 +692,7 @@ export const useBank = create<BankState>()((set, get) => ({
       s.refreshUsers(), s.refreshTxns(), s.refreshLoans(), s.refreshRequests(),
       s.refreshMoneyRequests(), s.refreshNotifs(), s.refreshAnnouncements(),
     ])
-    await Promise.all([s.refreshCards(), s.refreshFds()])
+    await Promise.all([s.refreshCards(), s.refreshFds(), s.refreshMarket(), s.refreshKyc(), s.refreshGateway()])
     await s.refreshUsers()
     set({ ready: true })
     get().startRealtime()
@@ -480,6 +718,8 @@ export const useBank = create<BankState>()((set, get) => ({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_fds' }, () => get().refreshFds())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_loans' }, () => get().refreshLoans())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_announcements' }, () => get().refreshAnnouncements())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_stocks' }, () => get().refreshMarket())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jb_mf_funds' }, () => get().refreshMarket())
       .subscribe()
   },
 
@@ -691,6 +931,139 @@ export const useBank = create<BankState>()((set, get) => ({
   resetBank: async () => {
     await supabase.rpc('jb_reset_demo')
     await get().loadAll()
+  },
+
+  /* ---------------- KYC ---------------- */
+  submitKyc: async (userId, fields) => {
+    const { data, error } = await supabase.rpc('jb_submit_kyc', {
+      p_user: userId,
+      p_pan: fields.pan,
+      p_dob: fields.dob,
+      p_gender: fields.gender,
+      p_occupation: fields.occupation,
+      p_income_band: fields.incomeBand,
+      p_address: fields.address,
+      p_city: fields.city,
+      p_state: fields.state,
+      p_pincode: fields.pincode,
+      p_nominee_name: fields.nomineeName || null,
+      p_nominee_relation: fields.nomineeRelation || null,
+    })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await Promise.all([get().refreshKyc(), get().refreshRequests()])
+    return { ok: true }
+  },
+
+  /* ---------------- Mutual funds ---------------- */
+  mfBuy: async (userId, fundId, amount) => {
+    const { data, error } = await supabase.rpc('jb_mf_buy', { p_user: userId, p_fund: fundId, p_amount: amount })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await Promise.all([get().refreshMarket(), get().refreshTxns(), get().refreshUsers()])
+    return { ok: true }
+  },
+  mfRedeem: async (userId, fundId, units) => {
+    const { data, error } = await supabase.rpc('jb_mf_redeem', { p_user: userId, p_fund: fundId, p_units: units })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await Promise.all([get().refreshMarket(), get().refreshTxns(), get().refreshUsers()])
+    return { ok: true }
+  },
+  mfSetupSip: async (userId, fundId, amount, day) => {
+    const { data, error } = await supabase.rpc('jb_mf_setup_sip', { p_user: userId, p_fund: fundId, p_amount: amount, p_day: day })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshMarket()
+    return { ok: true }
+  },
+  mfCancelSip: async (userId, fundId) => {
+    const { data, error } = await supabase.rpc('jb_mf_cancel_sip', { p_user: userId, p_fund: fundId })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshMarket()
+    return { ok: true }
+  },
+  mfNavTick: async () => {
+    const { data, error } = await supabase.rpc('jb_mf_nav_tick')
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshMarket()
+    return { ok: true }
+  },
+
+  /* ---------------- Stock market ---------------- */
+  stockPlaceOrder: async (userId, stockId, side, type, qty, limitPrice) => {
+    const { data, error } = await supabase.rpc('jb_stock_place_order', {
+      p_user: userId, p_stock: stockId, p_side: side, p_type: type, p_qty: qty, p_limit_price: limitPrice || null,
+    })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await Promise.all([get().refreshMarket(), get().refreshTxns(), get().refreshUsers()])
+    return { ok: true }
+  },
+  stockCancelOrder: async (userId, orderId) => {
+    const { data, error } = await supabase.rpc('jb_stock_cancel_order', { p_user: userId, p_order: orderId })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await Promise.all([get().refreshMarket(), get().refreshTxns(), get().refreshUsers()])
+    return { ok: true }
+  },
+  marketTick: async () => {
+    const { data, error } = await supabase.rpc('jb_market_tick')
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await Promise.all([get().refreshMarket(), get().refreshTxns(), get().refreshUsers()])
+    return { ok: true }
+  },
+
+  /* ---------------- Payment gateway ---------------- */
+  registerMerchant: async (name, app, callback) => {
+    const { data, error } = await supabase.rpc('jb_gateway_register_merchant', { p_name: name, p_app: app, p_callback: callback || null })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshGateway()
+    return { ok: true, merchant: j.merchant as Merchant }
+  },
+  gatewayPay: async (payToken, userId) => {
+    const { data, error } = await supabase.rpc('jb_gateway_pay', { p_pay_token: payToken, p_user: userId })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await Promise.all([get().refreshGateway(), get().refreshTxns(), get().refreshUsers()])
+    return { ok: true, ...j }
+  },
+  gatewayGetOrder: async (payToken) => {
+    const { data, error } = await supabase.rpc('jb_gateway_get_order', { p_pay_token: payToken })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    return { ok: true, order: j.order }
+  },
+  gatewayVerify: async (apiKey, apiSecret, orderRef) => {
+    const { data, error } = await supabase.rpc('jb_gateway_verify', { p_api_key: apiKey, p_api_secret: apiSecret, p_order_ref: orderRef })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    return { ok: true, order: j }
+  },
+  gatewaySettle: async (merchantId) => {
+    const { data, error } = await supabase.rpc('jb_gateway_settle', { p_merchant: merchantId })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshGateway()
+    return { ok: true, amount: j.amount }
   },
 }))
 

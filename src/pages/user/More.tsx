@@ -10,6 +10,8 @@ import {
   LogOut,
   ShieldCheck,
   CreditCard,
+  PieChart,
+  LineChart,
 } from 'lucide-react'
 import { useBank, useToast } from '../../store'
 import { Avatar } from '../../components/ui'
@@ -29,6 +31,8 @@ export default function More() {
     { label: 'Profile', Icon: UserRound, to: '/profile', tint: 'text-primary' },
     { label: 'Loans', Icon: Landmark, to: '/loans', tint: 'text-accent' },
     { label: 'Fixed Deposit', Icon: PiggyBank, to: '/fd', tint: 'text-warning' },
+    { label: 'Mutual Funds', Icon: PieChart, to: '/mf', tint: 'text-primary' },
+    { label: 'Stock Market', Icon: LineChart, to: '/stocks', tint: 'text-accent' },
     { label: 'Add Money', Icon: Plus, to: '/', tint: 'text-success' },
     { label: 'Withdraw', Icon: Banknote, to: '/withdraw', tint: 'text-danger' },
     { label: 'Cards', Icon: CreditCard, to: '/cards', tint: 'text-primary' },
