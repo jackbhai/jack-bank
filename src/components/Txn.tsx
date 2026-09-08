@@ -56,6 +56,8 @@ export function txnMeta(type: TxnType): { label: string; Icon: LucideIcon; cls: 
       return { label: 'Stock Sold', Icon: TrendingUp, cls: 'bg-success/12 text-success' }
     case 'gateway_pay':
       return { label: 'Merchant Pay', Icon: Receipt, cls: 'bg-accent/12 text-accent' }
+    case 'gateway_refund':
+      return { label: 'Gateway Refund', Icon: ArrowDownLeft, cls: 'bg-success/12 text-success' }
     case 'skin_buy':
       return { label: 'Skin Purchase', Icon: BadgePercent, cls: 'bg-primary/12 text-primary' }
     default:

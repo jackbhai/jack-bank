@@ -6,7 +6,8 @@ import { inr, inrFull, fmtDateTime } from '../../lib/utils'
 import { DebitCard, CreditCard } from '../../components/Cards'
 import { Button, Segmented, Sheet, TopBar, inputCls, RefreshButton } from '../../components/ui'
 import { txnMeta } from '../../components/Txn'
-import type { Card } from '../../lib/types'
+import { TxnDetail } from '../../components/TxnDetail'
+import type { Card, Transaction } from '../../lib/types'
 
 export default function Cards() {
   const nav = useNavigate()
@@ -33,6 +34,7 @@ export default function Cards() {
   const [reqType, setReqType] = useState<'debit' | 'credit'>('credit')
   const [reqLimit, setReqLimit] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [detail, setDetail] = useState<Transaction | null>(null)
 
   const list = tab === 'debit' ? debit : credit
   const active = list[0]
@@ -175,7 +177,11 @@ export default function Cards() {
                           const isPay = t.type === 'card_payment'
                           const meta = txnMeta(t.type)
                           return (
-                            <div key={t.id} className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
+                            <button
+                              key={t.id}
+                              onClick={() => setDetail(t)}
+                              className="w-full flex items-center gap-3 py-2.5 border-b border-line last:border-0 text-left active:bg-surface2 transition-colors"
+                            >
                               <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${meta.cls}`}>
                                 <meta.Icon size={17} />
                               </span>
@@ -186,7 +192,7 @@ export default function Cards() {
                               <span className={`text-[13px] font-bold ${isPay ? 'text-success' : 'text-danger'}`}>
                                 {isPay ? '+' : '−'}{inr(t.amount)}
                               </span>
-                            </div>
+                            </button>
                           )
                         })}
                       </div>
@@ -304,6 +310,8 @@ export default function Cards() {
           </Button>
         </div>
       </Sheet>
+
+      <TxnDetail txn={detail} users={users} meId={me.id} onClose={() => setDetail(null)} />
     </div>
   )
 }

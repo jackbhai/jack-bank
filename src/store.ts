@@ -287,6 +287,9 @@ const mapGatewayOrder = (o: any): GatewayOrder => ({
   payToken: o.pay_token,
   createdAt: new Date(o.created_at).getTime(),
   paidAt: o.paid_at ? new Date(o.paid_at).getTime() : null,
+  payMethod: o.pay_method ?? null,
+  fee: num(o.fee ?? 0),
+  settledAt: o.settled_at ? new Date(o.settled_at).getTime() : null,
 })
 
 const mapKyc = (k: any): KycDoc => ({
@@ -408,7 +411,8 @@ interface BankState {
   gatewayGetOrder: (payToken: string) => Promise<Res & { order?: any }>
   gatewayCreateOrder: (apiKey: string, apiSecret: string, orderRef: string, amount: number, note: string) => Promise<Res & { order?: any }>
   gatewayVerify: (apiKey: string, apiSecret: string, orderRef: string) => Promise<Res & { order?: any }>
-  gatewaySettle: (merchantId: string) => Promise<Res>
+  gatewaySettle: (merchantId: string) => Promise<Res & { amount?: number; ordersSetled?: number }>
+  gatewayRefund: (orderId: string) => Promise<Res>
   refreshSkins: () => Promise<void>
   buySkin: (skinId: string) => Promise<Res>
   equipSkin: (skinId: string) => Promise<Res>
@@ -1185,7 +1189,16 @@ export const useBank = create<BankState>()((set, get) => ({
     const j = data as any
     if (!j.ok) return { ok: false, error: j.error }
     await get().refreshGateway()
-    return { ok: true, amount: j.amount }
+    return { ok: true, amount: j.amount, ordersSetled: j.orders_settled }
+  },
+
+  gatewayRefund: async (orderId) => {
+    const { data, error } = await supabase.rpc('jb_gateway_refund', { p_order: orderId })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await Promise.all([get().refreshGateway(), get().refreshTxns(), get().refreshUsers()])
+    return { ok: true }
   },
 
   /* ---------------- Per-user settings ---------------- */

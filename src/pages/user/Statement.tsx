@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Search, Download, ArrowDownLeft, ArrowUpRight, ListFilter } from 'lucide-react'
+import { Search, Download, ArrowDownLeft, ArrowUpRight, ListFilter, ChevronRight } from 'lucide-react'
 import { useBank, useToast } from '../../store'
 import { downloadCsv, fmtDay, fmtTime, inr } from '../../lib/utils'
 import { TxnIcon, txnMeta } from '../../components/Txn'
+import { TxnDetail } from '../../components/TxnDetail'
 import { Empty, TopBar, inputCls, RefreshButton } from '../../components/ui'
 import type { Transaction } from '../../lib/types'
 
@@ -20,6 +21,7 @@ export default function Statement() {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [refreshing, setRefreshing] = useState(false)
+  const [detail, setDetail] = useState<Transaction | null>(null)
 
   const doRefresh = async () => {
     setRefreshing(true)
@@ -142,33 +144,48 @@ export default function Statement() {
         {filtered.length === 0 && (
           <Empty icon={ListFilter} title="No transactions found" sub="Try a different filter or search" />
         )}
-        {groups.map(([day, list]) => (
-          <div key={day}>
-            <p className="text-[11px] font-bold text-muted uppercase tracking-wide mb-2">{day}</p>
-            <div className="card divide-y divide-line">
-              {list.map((t) => {
-                const { label } = txnMeta(t.type)
-                const name = counterpart(t)
-                return (
-                  <div key={t.id} className="flex items-center gap-3 p-3.5">
-                    <TxnIcon type={t.type} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13.5px] font-semibold text-text truncate">{name || label}</p>
-                      <p className="text-[11.5px] text-muted">
-                        {label} · {fmtTime(t.createdAt)} {t.note ? '· ' + t.note : ''}
-                      </p>
-                    </div>
-                    <span className={`text-[14px] font-bold ${isCredit(t) ? 'text-success' : 'text-text'}`}>
-                      {isCredit(t) ? '+' : '−'}
-                      {inr(t.amount)}
-                    </span>
-                  </div>
-                )
-              })}
+        {groups.map(([day, list]) => {
+          const dayNet = list.reduce((a, t) => a + (isCredit(t) ? t.amount : -t.amount), 0)
+          return (
+            <div key={day}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] font-bold text-muted uppercase tracking-wide">{day}</p>
+                <p className={`text-[11px] font-bold ${dayNet >= 0 ? 'text-success' : 'text-danger'}`}>
+                  {dayNet >= 0 ? '+' : '−'}{inr(Math.abs(dayNet))} · {list.length} txn
+                </p>
+              </div>
+              <div className="card divide-y divide-line">
+                {list.map((t) => {
+                  const { label } = txnMeta(t.type)
+                  const name = counterpart(t)
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setDetail(t)}
+                      className="w-full flex items-center gap-3 p-3.5 text-left active:bg-surface2 transition-colors"
+                    >
+                      <TxnIcon type={t.type} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13.5px] font-semibold text-text truncate">{name || label}</p>
+                        <p className="text-[11.5px] text-muted truncate">
+                          {label} · {fmtTime(t.createdAt)} {t.note ? '· ' + t.note : ''}
+                        </p>
+                      </div>
+                      <span className={`text-[14px] font-bold ${isCredit(t) ? 'text-success' : 'text-text'}`}>
+                        {isCredit(t) ? '+' : '−'}
+                        {inr(t.amount)}
+                      </span>
+                      <ChevronRight size={15} className="text-faint" />
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
+
+      <TxnDetail txn={detail} users={users} meId={me.id} onClose={() => setDetail(null)} />
     </div>
   )
 }

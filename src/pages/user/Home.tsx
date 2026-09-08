@@ -27,6 +27,7 @@ import { BankLogo } from '../../components/Cards'
 import { Avatar, Sheet, Button, PinPad, RefreshButton } from '../../components/ui'
 import { PaySourceSelector, type PaySource } from '../../components/Pay'
 import { TxnIcon, txnMeta } from '../../components/Txn'
+import { TxnDetail } from '../../components/TxnDetail'
 import type { Transaction, MoneyRequest } from '../../lib/types'
 
 export default function Home() {
@@ -59,6 +60,7 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false)
   const [payReq, setPayReq] = useState<MoneyRequest | null>(null)
   const [paySource, setPaySource] = useState<PaySource>('balance')
+  const [detail, setDetail] = useState<Transaction | null>(null)
 
   const creditCard = me.cards.find((c) => c.type === 'credit' && c.status === 'active')
   const cardAvailable = creditCard ? Math.max(0, (creditCard.creditLimit || 0) - (creditCard.dueAmount || 0)) : 0
@@ -269,7 +271,11 @@ export default function Home() {
             const name = counterpartName(t)
             const { label } = txnMeta(t.type)
             return (
-              <div key={t.id} className="flex items-center gap-3 p-3.5">
+              <button
+                key={t.id}
+                onClick={() => setDetail(t)}
+                className="w-full flex items-center gap-3 p-3.5 text-left active:bg-surface2 transition-colors"
+              >
                 <TxnIcon type={t.type} />
                 <div className="flex-1 min-w-0">
                   <p className="text-[13.5px] font-semibold text-text truncate">{name || label}</p>
@@ -279,7 +285,7 @@ export default function Home() {
                   {signed(t) >= 0 ? '+' : '−'}
                   {inr(Math.abs(signed(t)))}
                 </span>
-              </div>
+              </button>
             )
           })}
         </div>
@@ -345,6 +351,8 @@ export default function Home() {
           </div>
         )}
       </Sheet>
+
+      <TxnDetail txn={detail} users={users} meId={me.id} onClose={() => setDetail(null)} />
     </div>
   )
 }

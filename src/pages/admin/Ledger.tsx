@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react'
-import { Search, Download, ScrollText, ArrowLeftRight } from 'lucide-react'
+import { Search, Download, ScrollText, ArrowLeftRight, ChevronRight } from 'lucide-react'
 import { useBank, useToast } from '../../store'
 import { downloadCsv, fmtDateTime, inrCompact, inr } from '../../lib/utils'
 import { TxnIcon, txnMeta } from '../../components/Txn'
+import { TxnDetail } from '../../components/TxnDetail'
 import { Empty, inputCls } from '../../components/ui'
+import type { Transaction } from '../../lib/types'
 
 export default function Ledger() {
   const toast = useToast((s) => s.toast)
   const transactions = useBank((s) => s.transactions)
   const users = useBank((s) => s.users)
   const [q, setQ] = useState('')
+  const [detail, setDetail] = useState<Transaction | null>(null)
 
   const nameOf = (id: string | null) => (id ? users.find((u) => u.id === id)?.name || '—' : '—')
 
@@ -75,21 +78,28 @@ export default function Ledger() {
         {filtered.slice(0, 80).map((t) => {
           const { label } = txnMeta(t.type)
           return (
-            <div key={t.id} className="card p-3.5 flex items-center gap-3">
+            <button
+              key={t.id}
+              onClick={() => setDetail(t)}
+              className="card p-3.5 flex items-center gap-3 text-left active:bg-surface2 transition-colors"
+            >
               <TxnIcon type={t.type} />
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-text">
+                <p className="text-[13px] font-semibold text-text truncate">
                   {nameOf(t.fromUserId)} <ArrowLeftRight size={11} className="inline text-faint mx-0.5" /> {nameOf(t.toUserId)}
                 </p>
-                <p className="text-[11px] text-muted">
+                <p className="text-[11px] text-muted truncate">
                   {label} · {fmtDateTime(t.createdAt)}
                 </p>
               </div>
               <span className="text-[13.5px] font-bold text-text">{inr(t.amount)}</span>
-            </div>
+              <ChevronRight size={15} className="text-faint" />
+            </button>
           )
         })}
       </div>
+
+      <TxnDetail txn={detail} users={users} onClose={() => setDetail(null)} />
     </div>
   )
 }

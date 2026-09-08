@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Store, Copy, Check, Plus, Globe, KeyRound, Wallet, ArrowDownToLine, Terminal, X, PlayCircle, ReceiptText, TrendingUp } from 'lucide-react'
+import { Store, Copy, Check, Plus, Globe, KeyRound, Wallet, ArrowDownToLine, Terminal, X, PlayCircle, ReceiptText, TrendingUp, ChevronRight, RotateCcw, Link2, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { useBank, useToast } from '../../store'
-import { inr, fmtDateTime } from '../../lib/utils'
-import type { Merchant } from '../../lib/types'
+import { inr, inrFull, fmtDateTime } from '../../lib/utils'
+import type { Merchant, GatewayOrder } from '../../lib/types'
 import { Button, Field, Sheet, TopBar, inputCls } from '../../components/ui'
 
 export default function Gateway() {
@@ -12,6 +12,7 @@ export default function Gateway() {
   const users = useBank((s) => s.users)
   const registerMerchant = useBank((s) => s.registerMerchant)
   const gatewaySettle = useBank((s) => s.gatewaySettle)
+  const gatewayRefund = useBank((s) => s.gatewayRefund)
   const gatewayCreateOrder = useBank((s) => s.gatewayCreateOrder)
 
   const [open, setOpen] = useState(false)
@@ -25,6 +26,7 @@ export default function Gateway() {
   const [testAmt, setTestAmt] = useState('100')
   const [testRef, setTestRef] = useState('TEST-' + Date.now().toString().slice(-6))
   const [testNote, setTestNote] = useState('Test purchase')
+  const [orderDetail, setOrderDetail] = useState<GatewayOrder | null>(null)
 
   const copy = async (v: string, label: string) => {
     try {
@@ -127,18 +129,23 @@ export default function Gateway() {
             const m = merchants.find((x) => x.id === o.merchantId)
             const payer = users.find((u) => u.id === o.payerId)
             return (
-              <div key={o.id} className="card p-3.5 flex items-center justify-between">
+              <button
+                key={o.id}
+                onClick={() => setOrderDetail(o)}
+                className="card p-3.5 flex items-center justify-between text-left active:bg-surface2 transition-colors"
+              >
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-text truncate">{m?.name || '—'} · <span className="text-muted font-normal">{o.orderRef}</span></p>
-                  <p className="text-[11px] text-muted">{payer ? `Paid by ${payer.name}` : '—'} · {fmtDateTime(o.createdAt)}</p>
+                  <p className="text-[11px] text-muted">{payer ? `Paid by ${payer.name}` : 'Awaiting payment'} · {fmtDateTime(o.createdAt)}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-[13px] font-bold text-text">{inr(o.amount)}</span>
-                  <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-md uppercase ${o.status === 'paid' ? 'bg-success/12 text-success' : o.status === 'pending' ? 'bg-warning/12 text-warning' : 'bg-surface2 text-muted'}`}>
+                  <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-md uppercase ${o.status === 'paid' ? 'bg-success/12 text-success' : o.status === 'pending' ? 'bg-warning/12 text-warning' : o.status === 'refunded' ? 'bg-danger/12 text-danger' : 'bg-surface2 text-muted'}`}>
                     {o.status}
                   </span>
+                  <ChevronRight size={15} className="text-faint" />
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>
@@ -215,6 +222,92 @@ export default function Gateway() {
         )}
       </Sheet>
 
+      {/* order detail */}
+      <Sheet open={!!orderDetail} onClose={() => setOrderDetail(null)} title="Order details">
+        {orderDetail && (() => {
+          const m = merchants.find((x) => x.id === orderDetail.merchantId)
+          const payer = users.find((u) => u.id === orderDetail.payerId)
+          const net = orderDetail.amount - orderDetail.fee
+          const steps = [
+            { label: 'Order created', at: orderDetail.createdAt, done: true },
+            { label: 'Paid', at: orderDetail.paidAt, done: orderDetail.status === 'paid' || orderDetail.status === 'refunded' },
+            { label: 'Settled', at: orderDetail.settledAt, done: !!orderDetail.settledAt },
+          ]
+          const payUrl = `${location.origin}${location.pathname}#/gateway/${orderDetail.payToken}`
+          return (
+            <div className="pt-2 flex flex-col gap-4 pb-2">
+              <div className="flex flex-col items-center text-center gap-1.5">
+                <span className={`w-12 h-12 rounded-2xl flex items-center justify-center ${orderDetail.status === 'paid' ? 'bg-success/12 text-success' : orderDetail.status === 'pending' ? 'bg-warning/12 text-warning' : orderDetail.status === 'refunded' ? 'bg-danger/12 text-danger' : 'bg-surface2 text-muted'}`}>
+                  <Store size={22} />
+                </span>
+                <p className="text-[15px] font-bold text-text">{m?.name || 'Merchant'}</p>
+                <p className="text-[26px] font-bold text-text">{inrFull(orderDetail.amount)}</p>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${orderDetail.status === 'paid' ? 'bg-success/12 text-success' : orderDetail.status === 'pending' ? 'bg-warning/12 text-warning' : orderDetail.status === 'refunded' ? 'bg-danger/12 text-danger' : 'bg-surface2 text-muted'}`}>
+                  {orderDetail.status}
+                </span>
+              </div>
+
+              {/* timeline */}
+              <div className="card p-4">
+                {steps.map((s, i) => (
+                  <div key={s.label} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center ${s.done ? 'bg-primary text-white' : 'bg-surface2 text-faint'}`}>
+                        {s.done ? <CheckCircle2 size={13} /> : <Clock size={12} />}
+                      </span>
+                      {i < steps.length - 1 && <span className={`w-0.5 flex-1 min-h-[18px] ${steps[i + 1].done ? 'bg-primary' : 'bg-line'}`} />}
+                    </div>
+                    <div className="pb-3">
+                      <p className="text-[13px] font-semibold text-text">{s.label}</p>
+                      <p className="text-[11px] text-muted">{s.at ? fmtDateTime(s.at) : '—'}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="card p-3.5 space-y-0">
+                <DetailRow label="Order reference" value={orderDetail.orderRef} mono />
+                <DetailRow label="App" value={m?.appName || '—'} />
+                <DetailRow label="Payer" value={payer ? `${payer.name} (${payer.upiId})` : '—'} />
+                <DetailRow label="Pay method" value={orderDetail.payMethod === 'card' ? 'Credit card' : orderDetail.payMethod === 'balance' ? 'Balance / UPI' : '—'} />
+                <DetailRow label="Gateway fee" value={orderDetail.fee > 0 ? inr(orderDetail.fee) : '—'} />
+                <DetailRow label="Net settlement" value={orderDetail.status === 'pending' ? '—' : inr(net)} />
+                {orderDetail.note && <DetailRow label="Note" value={orderDetail.note} />}
+                <DetailRow label="Currency" value={orderDetail.currency} last />
+              </div>
+
+              <button
+                onClick={() => {
+                  try {
+                    navigator.clipboard.writeText(payUrl)
+                    toast('Pay link copied', 'success')
+                  } catch {
+                    toast('Could not copy', 'error')
+                  }
+                }}
+                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-surface2 border border-line text-[13px] font-semibold text-text"
+              >
+                <Link2 size={15} /> Copy pay link
+              </button>
+
+              {orderDetail.status === 'paid' && (
+                <Button
+                  variant="danger"
+                  full
+                  onClick={async () => {
+                    const res = await gatewayRefund(orderDetail.id)
+                    toast(res.ok ? `Refunded ${inrFull(orderDetail.amount)}` : res.error || 'Failed', res.ok ? 'success' : 'error')
+                    if (res.ok) setOrderDetail(null)
+                  }}
+                >
+                  <RotateCcw size={16} /> Refund payment
+                </Button>
+              )}
+            </div>
+          )
+        })()}
+      </Sheet>
+
       {/* docs */}
       <Sheet open={docs} onClose={() => setDocs(false)} title="Gateway API">
         <div className="pt-1 flex flex-col gap-3 text-[12.5px] text-muted">
@@ -231,10 +324,24 @@ Body: { p_api_key, p_api_secret, p_order_ref,
 Body: { p_api_key, p_api_secret, p_order_ref }
 → returns status: paid / pending`}
           </pre>
+          <pre className="card p-3.5 text-[11.5px] font-mono text-text bg-surface2 overflow-x-auto whitespace-pre-wrap">
+{`POST /rest/v1/rpc/jb_gateway_refund  (admin only)
+Body: { p_order }
+→ reverses the payment to the payer`}
+          </pre>
           <p>Payments settle instantly into the merchant's Jack Bank settlement balance ({`${1.5}% gateway fee`}).</p>
           <Button variant="ghost" full onClick={() => setDocs(false)}><X size={15} /> Close</Button>
         </div>
       </Sheet>
+    </div>
+  )
+}
+
+function DetailRow({ label, value, mono, last }: { label: string; value: string; mono?: boolean; last?: boolean }) {
+  return (
+    <div className={`flex items-center justify-between py-2.5 gap-3 ${last ? '' : 'border-b border-line'}`}>
+      <span className="text-[12px] text-muted shrink-0">{label}</span>
+      <span className={`text-[12.5px] font-semibold text-text text-right ${mono ? 'font-mono' : ''}`}>{value}</span>
     </div>
   )
 }

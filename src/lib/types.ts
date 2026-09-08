@@ -68,7 +68,7 @@ export type TxnType =
   | 'emi' | 'card_spend' | 'card_payment' | 'loan_disbursal'
   | 'adjustment' | 'interest' | 'welcome' | 'fd_open' | 'fd_break'
   | 'mf_buy' | 'mf_redeem' | 'stock_buy' | 'stock_sell' | 'gateway_pay'
-  | 'skin_buy'
+  | 'gateway_refund' | 'skin_buy'
 
 export interface Transaction {
   id: string
@@ -286,11 +286,14 @@ export interface GatewayOrder {
   amount: number
   currency: string
   note: string | null
-  status: 'pending' | 'paid' | 'failed' | 'expired'
+  status: 'pending' | 'paid' | 'failed' | 'expired' | 'refunded'
   payerId: string | null
   payToken: string
   createdAt: number
   paidAt: number | null
+  payMethod?: string | null
+  fee: number
+  settledAt: number | null
 }
 
 export interface Session {
