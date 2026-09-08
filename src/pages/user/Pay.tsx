@@ -31,6 +31,11 @@ export default function Pay() {
   }
 
   const doPay = async (pin: string) => {
+    if (pin !== me.pin) {
+      setPinOpen(false)
+      toast('Incorrect PIN', 'error')
+      return
+    }
     const res = await transfer(Number(amount), me.id, to.id, 'upi', note || 'Scan & Pay')
     setPinOpen(false)
     if (res.ok) {

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { supabase, DEMO_PASSWORD } from './lib/supabase'
+import { supabase } from './lib/supabase'
 import type {
   ApprovalRequest,
   Card,
@@ -189,8 +189,9 @@ interface BankState {
   announcements: Announcement[]
 
   init: () => Promise<void>
-  loginUser: (userId: string, pin: string) => Promise<Res>
-  loginAdmin: (pin: string) => Promise<Res>
+  login: (email: string, password: string) => Promise<Res & { role?: string }>
+  signup: (name: string, email: string, phone: string, password: string, pin: string) => Promise<Res & { authed?: boolean }>
+  adminCreateUser: (email: string, password: string, name: string, phone: string, pin: string) => Promise<Res>
   logout: () => Promise<void>
   loadAll: () => Promise<void>
   stopRealtime: () => void
@@ -398,27 +399,42 @@ export const useBank = create<BankState>()((set, get) => ({
     set({ booting: false })
   },
 
-  loginUser: async (userId, pin) => {
-    const { data, error } = await supabase.rpc('jb_verify_pin', { p_user: userId, p_pin: pin })
+  login: async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return { ok: false, error: error.message }
-    const j = data as any
-    if (!j.ok) return { ok: false, error: j.error }
-    const { error: aerr } = await supabase.auth.signInWithPassword({ email: j.email, password: DEMO_PASSWORD })
-    if (aerr) return { ok: false, error: aerr.message }
-    set({ session: { role: j.role === 'admin' ? 'admin' : 'user', userId: j.id } })
+    const uid = data.user.id
+    const { data: prof } = await supabase.from('jb_profiles').select('id, role, status').eq('id', uid).single()
+    if (!prof) return { ok: false, error: 'Account not found' }
+    if (prof.status === 'blocked') return { ok: false, error: 'Account blocked. Contact the owner.' }
+    const role = prof.role === 'admin' ? 'admin' : 'user'
+    set({ session: { role, userId: uid } })
     await get().loadAll()
-    return { ok: true }
+    return { ok: true, role }
   },
 
-  loginAdmin: async (pin) => {
-    const { data, error } = await supabase.rpc('jb_verify_admin_pin', { p_pin: pin })
+  signup: async (name, email, phone, password, pin) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name, phone, pin } },
+    })
+    if (error) return { ok: false, error: error.message }
+    if (data.session) {
+      const uid = data.user!.id
+      set({ session: { role: 'user', userId: uid } })
+      await get().loadAll()
+      return { ok: true, authed: true }
+    }
+    return { ok: true, authed: false }
+  },
+
+  adminCreateUser: async (email, password, name, phone, pin) => {
+    const { data, error } = await supabase.rpc('jb_admin_create_user', {
+      p_email: email, p_password: password, p_name: name, p_phone: phone || null, p_pin: pin || null,
+    })
     if (error) return { ok: false, error: error.message }
     const j = data as any
     if (!j.ok) return { ok: false, error: j.error }
-    const { error: aerr } = await supabase.auth.signInWithPassword({ email: j.email, password: DEMO_PASSWORD })
-    if (aerr) return { ok: false, error: aerr.message }
-    set({ session: { role: 'admin', userId: j.id } })
-    await get().loadAll()
     return { ok: true }
   },
 

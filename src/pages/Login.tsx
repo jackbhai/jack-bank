@@ -1,40 +1,35 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ShieldCheck, Users, Loader2 } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react'
 import { useBank, useToast } from '../store'
 import { BankLogo } from '../components/Cards'
-import { Avatar, Segmented, Sheet, PinPad } from '../components/ui'
+import { Button, inputCls } from '../components/ui'
 
 export default function Login() {
   const nav = useNavigate()
   const toast = useToast((s) => s.toast)
-  const directory = useBank((s) => s.directory)
-  const loginUser = useBank((s) => s.loginUser)
-  const loginAdmin = useBank((s) => s.loginAdmin)
+  const login = useBank((s) => s.login)
 
-  const [mode, setMode] = useState<'user' | 'admin'>('user')
-  const [selected, setSelected] = useState<string | null>(null)
-  const [pinOpen, setPinOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const handlePin = async (pin: string) => {
-    setPinOpen(false)
-    setBusy(true)
-    if (mode === 'user' && selected) {
-      const res = await loginUser(selected, pin)
-      if (res.ok) {
-        toast('Welcome back!', 'success')
-        nav('/')
-      } else toast(res.error || 'Login failed', 'error')
-    } else {
-      const res = await loginAdmin(pin)
-      if (res.ok) {
-        toast('Admin signed in', 'success')
-        nav('/admin')
-      } else toast(res.error || 'Login failed', 'error')
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email.trim() || !password) {
+      toast('Enter email and password', 'error')
+      return
     }
+    setBusy(true)
+    const res = await login(email.trim(), password)
     setBusy(false)
-    setSelected(null)
+    if (res.ok) {
+      toast('Welcome to Jack Bank!', 'success')
+      nav(res.role === 'admin' ? '/admin' : '/')
+    } else {
+      toast(res.error || 'Login failed', 'error')
+    }
   }
 
   return (
@@ -49,82 +44,57 @@ export default function Login() {
         </p>
       </div>
 
-      <div className="mt-8 anim-up" style={{ animationDelay: '0.08s' }}>
-        <Segmented
-          options={[
-            { id: 'user', label: 'Friends' },
-            { id: 'admin', label: 'Admin' },
-          ]}
-          value={mode}
-          onChange={setMode}
-        />
+      <form onSubmit={submit} className="mt-9 flex flex-col gap-3 anim-up" style={{ animationDelay: '0.1s' }}>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-muted uppercase tracking-wide">Email</span>
+          <input
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-muted uppercase tracking-wide">Password</span>
+          <div className="relative">
+            <input
+              type={showPw ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className={inputCls + ' pr-11'}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw((s) => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-faint"
+            >
+              {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </label>
+
+        <Button type="submit" full disabled={busy} className="mt-2">
+          {busy ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+          {busy ? 'Signing in…' : 'Sign In'}
+        </Button>
+      </form>
+
+      <div className="mt-5 card p-4 flex flex-col items-center gap-2 anim-up" style={{ animationDelay: '0.16s' }}>
+        <p className="text-[13px] text-muted">New to Jack Bank?</p>
+        <Link to="/signup" className="w-full">
+          <Button variant="outline" full>
+            Create an account
+          </Button>
+        </Link>
       </div>
 
-      {busy && (
-        <div className="mt-8 flex flex-col items-center gap-3 text-muted anim-fade">
-          <Loader2 size={28} className="animate-spin text-primary" />
-          <p className="text-[13px] font-semibold">Signing in…</p>
-        </div>
-      )}
-
-      {!busy && mode === 'user' && (
-        <div className="mt-5 flex flex-col gap-2.5 anim-up" style={{ animationDelay: '0.14s' }}>
-          {directory.map((u) => (
-            <button
-              key={u.id}
-              onClick={() => {
-                setSelected(u.id)
-                setPinOpen(true)
-              }}
-              className="flex items-center gap-3.5 card p-3.5 text-left active:scale-[0.98] transition-all"
-            >
-              <Avatar name={u.name} hue={u.avatarHue} size={44} />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-text text-[15px]">{u.name}</p>
-                <p className="text-[12px] text-muted truncate">{u.upiId}</p>
-              </div>
-              {u.status === 'blocked' && (
-                <span className="text-[10px] font-bold text-danger bg-danger/10 px-2 py-1 rounded-md">Blocked</span>
-              )}
-            </button>
-          ))}
-          {directory.length === 0 && (
-            <p className="text-center text-[13px] text-muted py-6">
-              Loading friends… check your connection and reload.
-            </p>
-          )}
-        </div>
-      )}
-
-      {!busy && mode === 'admin' && (
-        <div className="mt-5 card p-5 flex flex-col items-center gap-3 anim-up" style={{ animationDelay: '0.14s' }}>
-          <ShieldCheck size={30} className="text-primary" />
-          <p className="text-[14px] font-semibold text-text">Bank Owner Access</p>
-          <p className="text-[12px] text-muted text-center">
-            Manage approvals, charges, rules and the entire banking system.
-          </p>
-          <button
-            onClick={() => setPinOpen(true)}
-            className="w-full bg-primary text-white font-semibold py-3 rounded-xl active:scale-[0.98] transition-all"
-          >
-            Enter Admin PIN
-          </button>
-          <p className="text-[11px] text-faint">Demo admin PIN: 2468</p>
-        </div>
-      )}
-
       <p className="mt-auto pt-8 text-center text-[11px] text-faint">
-        {mode === 'user' ? 'Friend PIN is 1234 · Virtual money only — no real funds' : 'Owner controls every rule of the bank'}
+        Virtual money only — no real funds. The owner approves deposits, withdrawals and loans.
       </p>
-
-      <Sheet open={pinOpen} onClose={() => setPinOpen(false)} title="Enter PIN">
-        <div className="pt-4">
-          <PinPad
-            onComplete={handlePin}
-            title={mode === 'user' ? `${directory.find((u) => u.id === selected)?.name || ''} · Enter PIN` : 'Admin PIN'}
-          />
-        </div>
-      </Sheet>
     </div>
   )
 }

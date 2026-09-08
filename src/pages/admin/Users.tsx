@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Search, Ban, CircleCheck, MinusCircle, PlusCircle, CreditCard, Landmark, IdCard } from 'lucide-react'
+import { Search, Ban, CircleCheck, MinusCircle, PlusCircle, CreditCard, Landmark, IdCard, UserPlus } from 'lucide-react'
 import { useBank, useToast } from '../../store'
 import { fmtDate, inr } from '../../lib/utils'
-import { Avatar, Modal, Button, Field, inputCls } from '../../components/ui'
+import { Avatar, Modal, Button, Field, inputCls, Sheet } from '../../components/ui'
 import type { User } from '../../lib/types'
 
 export default function Users() {
@@ -12,11 +12,18 @@ export default function Users() {
   const blockUser = useBank((s) => s.blockUser)
   const unblockUser = useBank((s) => s.unblockUser)
   const adminAdjust = useBank((s) => s.adminAdjust)
+  const adminCreateUser = useBank((s) => s.adminCreateUser)
 
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<User | null>(null)
   const [adjustAmt, setAdjustAmt] = useState('')
   const [adjustNote, setAdjustNote] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
+  const [cName, setCName] = useState('')
+  const [cEmail, setCEmail] = useState('')
+  const [cPhone, setCPhone] = useState('')
+  const [cPass, setCPass] = useState('')
+  const [cPin, setCPin] = useState('')
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
@@ -35,9 +42,17 @@ export default function Users() {
         <p className="text-[12.5px] text-muted mt-0.5">{users.length} accounts · tap to manage</p>
       </div>
 
-      <div className="relative mt-4">
-        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, UPI ID or account" className={inputCls + ' pl-10'} />
+      <div className="mt-4 flex gap-2">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, UPI ID or account" className={inputCls + ' pl-10'} />
+        </div>
+        <button
+          onClick={() => setCreateOpen(true)}
+          className="flex items-center gap-1.5 bg-primary text-white font-semibold px-3.5 rounded-xl text-[13px] active:scale-[0.97]"
+        >
+          <UserPlus size={16} /> Add
+        </button>
       </div>
 
       <div className="mt-4 flex flex-col gap-2.5">
@@ -184,6 +199,43 @@ export default function Users() {
           </div>
         )}
       </Modal>
+
+      <Sheet open={createOpen} onClose={() => setCreateOpen(false)} title="Add a friend">
+        <div className="pt-2 flex flex-col gap-3">
+          <p className="text-[12.5px] text-muted">
+            Create an account for a friend. Share the email and password with them — they'll sign in and get their own UPI ID, account number and debit card instantly.
+          </p>
+          <Field label="Full name">
+            <input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="e.g. Rohan Mehta" className={inputCls} />
+          </Field>
+          <Field label="Email">
+            <input type="email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} placeholder="friend@example.com" className={inputCls} />
+          </Field>
+          <Field label="Phone (optional)">
+            <input type="tel" inputMode="tel" value={cPhone} onChange={(e) => setCPhone(e.target.value)} placeholder="10-digit number" className={inputCls} />
+          </Field>
+          <Field label="Password">
+            <input type="text" value={cPass} onChange={(e) => setCPass(e.target.value)} placeholder="6+ characters" className={inputCls} />
+          </Field>
+          <Field label="UPI PIN (4 digits)">
+            <input type="password" inputMode="numeric" maxLength={4} value={cPin} onChange={(e) => setCPin(e.target.value.replace(/\D/g, ''))} placeholder="••••" className={inputCls} />
+          </Field>
+          <Button
+            full
+            disabled={!cName.trim() || !cEmail.trim() || cPass.length < 6 || !/^\d{4}$/.test(cPin)}
+            onClick={async () => {
+              const res = await adminCreateUser(cEmail.trim(), cPass, cName.trim(), cPhone.trim(), cPin)
+              toast(res.ok ? 'Friend added — share credentials with them' : res.error || 'Failed', res.ok ? 'success' : 'error')
+              if (res.ok) {
+                setCreateOpen(false)
+                setCName(''); setCEmail(''); setCPhone(''); setCPass(''); setCPin('')
+              }
+            }}
+          >
+            <UserPlus size={16} /> Create account
+          </Button>
+        </div>
+      </Sheet>
     </div>
   )
 }

@@ -6,10 +6,9 @@ A friends-only virtual banking simulation. Friends trade virtual money with each
 
 ## Live backend
 
-- Supabase project: `ghdwhgrqnedimudaeidc` (ap-northeast-2)
-- Schema: `supabase/schema.sql` · seed: `supabase/seed.sql`
-- All Jack Bank tables are `jb_`-prefixed (the project hosts another app too, so we namespaced everything).
-- Security: Row Level Security on every table + 25+ `SECURITY DEFINER` RPC functions as the banking engine.
+- Supabase project: `nksthsgrxudptwdbytoh` (ap-northeast-2) — dedicated project, no demo data
+- Schema: `supabase/schema.sql` · auth helpers: `supabase/migration2.sql` · user flows: `supabase/migration3.sql`
+- All Jack Bank tables are `jb_`-prefixed. Row Level Security on every table + 25+ `SECURITY DEFINER` RPC functions as the banking engine (fees, cashback, EMI, approvals — all server-side).
 
 ## Run locally
 
@@ -20,22 +19,21 @@ npm run dev            # http://localhost:5173
 npm run build
 ```
 
-`.env` is gitignored. The deployed/preview build needs the same two vars.
+`.env` is gitignored. The preview/deployed build needs the same two vars.
 
-## Demo logins
+## How people join
 
-| Role | Who | PIN |
-|------|-----|-----|
-| Friends | Aarav, Priya, Rohan, Sneha, Kabir | `1234` |
-| Owner (admin) | The one who built the app | `2468` |
+- **Owner (admin):** created for the app owner. Controls approvals, rules, charges and can add friends directly.
+- **Friends:** sign up themselves (name, email, phone, password, 4-digit UPI PIN) — auto-confirmed, they instantly get a UPI ID, account number, IFSC and a debit card.
+- **Owner adds a friend:** Admin panel → Users → **Add** — creates the account and shares the credentials.
 
-PIN is verified server-side (`jb_verify_pin` / `jb_verify_admin_pin`), then a real Supabase session is established, so every read/write goes through RLS. Demo auth accounts share the password `JackBank@12345` (change it in `src/lib/supabase.ts`).
+Login is **email + password**. The 4-digit UPI PIN is required to confirm payments (and can be changed in Settings).
 
 ## What's inside
 
 ### User panel (friends)
 - Home dashboard: balance, UPI ID copy, quick actions, pending money requests, recent activity, announcements
-- Send money (UPI ID / account+IFSC / phone) with PIN confirmation
+- Send money (UPI ID / account+IFSC / phone) with UPI-PIN confirmation
 - Request money from a friend
 - Scan & Pay (simulated scanner) + My QR (real UPI `upi://pay` QR, fixed amount, share/copy link)
 - Debit card (freeze/unfreeze, reveal number) + Credit card (flip for CVV, simulate spend, pay bill)
@@ -43,20 +41,19 @@ PIN is verified server-side (`jb_verify_pin` / `jb_verify_admin_pin`), then a re
 - Fixed deposits: book, maturity value, break early
 - Statement: search, credit/debit filter, CSV export
 - Profile: account details, credit score, rewards, KYC
-- Notifications, Settings (theme toggle + change PIN), Reset demo data
+- Notifications, Settings (theme toggle + change PIN)
 
 ### Admin panel (owner)
 - Dashboard: stats, 14-day volume chart, broadcast announcements
 - Approvals: deposit, withdrawal, loan, KYC, card requests — approve/reject
-- Users: view all accounts, block/unblock, manual credit/debit
+- Users: view all accounts, add friend, block/unblock, manual credit/debit
 - Rules: fees, cashback, limits, loan/card/FD interest rates, bank identity — all editable
 - Ledger: every transaction + CSV export
 
 ## Architecture notes
-- Data lives in Supabase (multi-device: friends on different phones trade in real time via Realtime subscriptions).
-- The banking engine (fees, cashback, EMI math, approval side-effects) runs **server-side** in Postgres functions, so it can't be cheated from the client.
-- Swap `src/lib/supabase.ts` to point at your own project; run the two SQL files to provision it.
-- To ship a native app, wrap the same build with Capacitor — the codebase is 100% web-standard.
+- Data lives in Supabase — friends on different phones trade in real time (Realtime subscriptions).
+- The banking engine runs server-side in Postgres functions, so it can't be cheated from the client.
+- To ship a native app, wrap the same build with Capacitor.
 
 ## Notes
 - All money is virtual. No real funds are involved.

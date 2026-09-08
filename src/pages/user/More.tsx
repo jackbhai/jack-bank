@@ -9,12 +9,10 @@ import {
   Settings,
   LogOut,
   ShieldCheck,
-  RotateCcw,
   CreditCard,
 } from 'lucide-react'
 import { useBank, useToast } from '../../store'
-import { Avatar, Modal, Button } from '../../components/ui'
-import { useState } from 'react'
+import { Avatar } from '../../components/ui'
 
 export default function More() {
   const nav = useNavigate()
@@ -22,12 +20,10 @@ export default function More() {
   const session = useBank((s) => s.session)
   const users = useBank((s) => s.users)
   const logout = useBank((s) => s.logout)
-  const resetBank = useBank((s) => s.resetBank)
   const notifs = useBank((s) => s.notifs)
 
   const me = users.find((u) => u.id === session?.userId)!
   const unread = notifs.filter((n) => n.userId === me.id && !n.read).length
-  const [resetOpen, setResetOpen] = useState(false)
 
   const tiles = [
     { label: 'Profile', Icon: UserRound, to: '/profile', tint: 'text-primary' },
@@ -94,41 +90,9 @@ export default function More() {
           </span>
           <span className="text-[13.5px] font-semibold text-danger">Log out</span>
         </button>
-        <button onClick={() => setResetOpen(true)} className="card p-4 flex items-center gap-3 text-left active:scale-[0.97]">
-          <span className="w-10 h-10 rounded-xl bg-surface2 text-muted flex items-center justify-center">
-            <RotateCcw size={19} />
-          </span>
-          <span className="text-[13.5px] font-semibold text-text">Reset demo data</span>
-        </button>
       </div>
 
       <p className="text-center text-[11px] text-faint mt-8">Jack Bank · v1.0 · Friends-only virtual banking</p>
-
-      <Modal open={resetOpen} onClose={() => setResetOpen(false)}>
-        <div className="flex flex-col gap-4 text-center">
-          <RotateCcw size={36} className="text-warning mx-auto" />
-          <div>
-            <p className="font-bold text-text text-[16px]">Reset everything?</p>
-            <p className="text-[13px] text-muted mt-1">All balances, transactions and settings go back to the original demo state.</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" full onClick={() => setResetOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              full
-              onClick={async () => {
-                await resetBank()
-                setResetOpen(false)
-                nav('/login')
-              }}
-            >
-              Reset
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   )
 }
