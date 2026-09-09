@@ -274,6 +274,7 @@ const mapMerchant = (m: any): Merchant => ({
   apiSecret: m.api_secret,
   settlement: num(m.settlement),
   status: m.status,
+  userId: m.user_id ?? null,
   createdAt: new Date(m.created_at).getTime(),
 })
 
@@ -379,6 +380,7 @@ interface BankState {
   gatewayOrders: GatewayOrder[]
   gatewayEvents: GatewayEvent[]
   gatewaySettlements: GatewaySettlement[]
+  myMerchant: Merchant | null
   kyc: KycDoc | null
   userSettings: Record<string, Record<string, any>>
   pricesUpdatedAt: number
@@ -439,6 +441,10 @@ interface BankState {
   gatewayOtpApprove: (payToken: string) => Promise<Res & { otp?: string; method?: string; to?: string; expiresIn?: number }>
   merchantSetStatus: (merchantId: string, status: 'active' | 'blocked') => Promise<Res>
   merchantRotateKeys: (merchantId: string) => Promise<Res & { apiKey?: string; apiSecret?: string }>
+  merchantReview: (merchantId: string, decision: 'approve' | 'reject') => Promise<Res>
+  merchantApply: (name: string, app: string, callback: string) => Promise<Res>
+  merchantGetMine: () => Promise<Res & { merchant?: Merchant | null }>
+  merchantMyOrders: () => Promise<Res & { orders?: any[] }>
   refreshSkins: () => Promise<void>
   buySkin: (skinId: string) => Promise<Res>
   equipSkin: (skinId: string) => Promise<Res>
@@ -755,7 +761,7 @@ export const useBank = create<BankState>()((set, get) => ({
       if (!sess && get().session) {
         get().stopRealtime()
         applyThemeSkin(null)
-        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], gatewayEvents: [], gatewaySettlements: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0, skins: [], ownedSkins: [] })
+        set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], gatewayEvents: [], gatewaySettlements: [], myMerchant: null, kyc: null, userSettings: {}, pricesUpdatedAt: 0, skins: [], ownedSkins: [] })
       }
     })
     set({ booting: false })
@@ -804,7 +810,7 @@ export const useBank = create<BankState>()((set, get) => ({
     await supabase.auth.signOut()
     get().stopRealtime()
     applyThemeSkin(null)
-    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], gatewayEvents: [], gatewaySettlements: [], kyc: null, userSettings: {}, pricesUpdatedAt: 0, skins: [], ownedSkins: [] })
+    set({ session: null, ready: false, users: [], transactions: [], cards: [], fds: [], loans: [], requests: [], moneyRequests: [], notifications: [], announcements: [], mfFunds: [], mfHoldings: [], mfTxns: [], stocks: [], stockOrders: [], stockHoldings: [], stockTrades: [], merchants: [], gatewayOrders: [], gatewayEvents: [], gatewaySettlements: [], myMerchant: null, kyc: null, userSettings: {}, pricesUpdatedAt: 0, skins: [], ownedSkins: [] })
   },
 
   loadAll: async () => {
@@ -1283,6 +1289,54 @@ export const useBank = create<BankState>()((set, get) => ({
     if (!j.ok) return { ok: false, error: j.error }
     await get().refreshGateway()
     return { ok: true, apiKey: j.api_key, apiSecret: j.api_secret }
+  },
+
+  merchantReview: async (merchantId, decision) => {
+    const { data, error } = await supabase.rpc('jb_merchant_review', { p_merchant: merchantId, p_decision: decision })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().refreshGateway()
+    return { ok: true }
+  },
+
+  merchantApply: async (name, app, callback) => {
+    const { data, error } = await supabase.rpc('jb_merchant_apply', { p_name: name, p_app: app, p_callback: callback || null })
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    await get().merchantGetMine()
+    return { ok: true }
+  },
+
+  merchantGetMine: async () => {
+    const { data, error } = await supabase.rpc('jb_merchant_my_app')
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    const raw = j.merchant
+    const mapped = raw ? {
+      id: raw.id,
+      name: raw.name,
+      appName: raw.app_name,
+      callbackUrl: raw.callback_url ?? null,
+      apiKey: raw.api_key,
+      apiSecret: raw.api_secret ?? '',
+      settlement: num(raw.settlement),
+      status: raw.status,
+      userId: null,
+      createdAt: new Date(raw.created_at).getTime(),
+    } as Merchant : null
+    set({ myMerchant: mapped })
+    return { ok: true, merchant: mapped }
+  },
+
+  merchantMyOrders: async () => {
+    const { data, error } = await supabase.rpc('jb_merchant_my_orders')
+    if (error) return { ok: false, error: error.message }
+    const j = data as any
+    if (!j.ok) return { ok: false, error: j.error }
+    return { ok: true, orders: j.orders ?? [] }
   },
 
   /* ---------------- Per-user settings ---------------- */

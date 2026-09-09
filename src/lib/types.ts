@@ -276,6 +276,7 @@ export interface Merchant {
   apiSecret: string
   settlement: number
   status: string
+  userId: string | null
   createdAt: number
 }
 

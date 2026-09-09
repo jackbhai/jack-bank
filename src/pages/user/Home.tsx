@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useSidebar } from '../../components/Sidebar'
 import {
   Bell,
+  Menu,
   Send,
   HandCoins,
   QrCode,
@@ -107,6 +109,9 @@ export default function Home() {
       {/* header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
+          <button onClick={() => useSidebar.getState().setOpen(true)} className="p-2 -ml-1.5 rounded-xl bg-surface border border-line text-muted">
+            <Menu size={20} />
+          </button>
           <BankLogo size={34} />
           <div>
             <p className="font-bold text-[16px] leading-tight">Jack Bank</p>

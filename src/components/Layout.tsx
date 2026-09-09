@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import { Home, QrCode, CreditCard, ReceiptText, LayoutGrid } from 'lucide-react'
 import { BottomNav } from './ui'
+import Sidebar from './Sidebar'
 
 const items = [
   { to: '/', icon: Home, label: 'Home' },
@@ -15,6 +16,7 @@ export default function Layout() {
     <div className="min-h-dvh max-w-md mx-auto px-5 pb-28">
       <Outlet />
       <BottomNav items={items} />
+      <Sidebar />
     </div>
   )
 }

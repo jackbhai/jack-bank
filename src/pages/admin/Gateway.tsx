@@ -5,7 +5,7 @@ import {
   Ban, Unlock, Download, ShieldCheck, Search, IndianRupee, BadgePercent, Undo2, Activity, CircleDollarSign,
 } from 'lucide-react'
 import { useBank, useToast } from '../../store'
-import { inr, inrFull, fmtDateTime, fmtTime } from '../../lib/utils'
+import { inr, inrFull, fmtDateTime, fmtTime, copyText } from '../../lib/utils'
 import type { Merchant, GatewayOrder, GatewayEvent } from '../../lib/types'
 import { Button, Field, Sheet, TopBar, inputCls } from '../../components/ui'
 
@@ -52,6 +52,7 @@ export default function Gateway() {
   const gatewayCreateOrder = useBank((s) => s.gatewayCreateOrder)
   const merchantSetStatus = useBank((s) => s.merchantSetStatus)
   const merchantRotateKeys = useBank((s) => s.merchantRotateKeys)
+  const merchantReview = useBank((s) => s.merchantReview)
 
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -70,12 +71,12 @@ export default function Gateway() {
   const [tab, setTab] = useState<Tab>('all')
 
   const copy = async (v: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(v)
+    const ok = await copyText(v)
+    if (ok) {
       setCopied(label)
       setTimeout(() => setCopied(''), 1500)
       toast('Copied', 'success')
-    } catch {
+    } else {
       toast('Could not copy', 'error')
     }
   }
@@ -218,43 +219,65 @@ export default function Gateway() {
           {merchants.map((m) => {
             const mOrders = orders.filter((o) => o.merchantId === m.id)
             const mRevenue = mOrders.filter((o) => o.status === 'paid' || o.status === 'refunded').reduce((a, o) => a + o.amount, 0)
+            const owner = users.find((u) => u.id === m.userId)
+            const pending = m.status === 'pending'
             return (
               <div key={m.id} className="card p-4">
                 <div className="flex items-center justify-between">
                   <button onClick={() => setMerchantDetail(m)} className="flex items-center gap-3 min-w-0 text-left flex-1">
-                    <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${m.status === 'active' ? 'bg-accent/12 text-accent' : 'bg-danger/12 text-danger'}`}>
+                    <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${m.status === 'active' ? 'bg-accent/12 text-accent' : m.status === 'pending' ? 'bg-warning/12 text-warning' : 'bg-danger/12 text-danger'}`}>
                       <Store size={19} />
                     </span>
                     <span className="min-w-0">
                       <span className="block font-bold text-[14px] text-text truncate">{m.name}</span>
                       <span className="block text-[11.5px] text-muted truncate">{m.appName} · {mOrders.length} orders · revenue {inr(mRevenue)}</span>
+                      {owner && <span className="block text-[11px] text-faint truncate">Owner: {owner.name} ({owner.upiId})</span>}
                     </span>
                   </button>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ml-2 ${m.status === 'active' ? 'bg-success/12 text-success' : 'bg-danger/12 text-danger'}`}>{m.status}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ml-2 ${m.status === 'active' ? 'bg-success/12 text-success' : m.status === 'pending' ? 'bg-warning/12 text-warning' : 'bg-danger/12 text-danger'}`}>{m.status}</span>
                 </div>
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-line">
-                  <button onClick={() => copy(m.apiKey, 'key' + m.id)} className="flex items-center gap-1.5 text-[11.5px] font-mono text-muted max-w-[46%] truncate">
-                    <KeyRound size={12} /> {m.apiKey.slice(0, 12)}…
-                  </button>
-                  <button onClick={() => { setTestAmt('100'); setTestRef('TEST-' + Date.now().toString().slice(-6)); setTestNote('Test purchase'); setTestOpen(m) }} className="flex items-center gap-1 text-[11.5px] font-bold text-accent bg-accent/12 px-2.5 py-1.5 rounded-lg">
-                    <PlayCircle size={13} /> Test pay
-                  </button>
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-[12px] text-muted flex items-center gap-1">
-                    <ReceiptText size={12} /> Unsettled <span className="font-bold text-text">{inr(m.settlement)}</span>
-                  </span>
-                  <button
-                    onClick={async () => {
-                      const res = await gatewaySettle(m.id)
-                      toast(res.ok ? `Settled ${inr(res.amount!)} (${res.ordersSetled ?? 0} orders)` : res.error || 'Failed', res.ok ? 'success' : 'error')
-                    }}
-                    disabled={m.settlement <= 0}
-                    className="flex items-center gap-1 text-[11.5px] font-bold text-primary bg-primary/12 px-2.5 py-1.5 rounded-lg disabled:opacity-40"
-                  >
-                    <ArrowDownToLine size={13} /> Settle
-                  </button>
-                </div>
+                {pending ? (
+                  <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-line">
+                    <Button full onClick={async () => {
+                      const res = await merchantReview(m.id, 'approve')
+                      toast(res.ok ? 'Gateway approved' : res.error || 'Failed', res.ok ? 'success' : 'error')
+                    }}>
+                      <CheckCircle2 size={15} /> Approve
+                    </Button>
+                    <Button variant="danger" full onClick={async () => {
+                      const res = await merchantReview(m.id, 'reject')
+                      toast(res.ok ? 'Gateway rejected' : res.error || 'Failed', res.ok ? 'success' : 'error')
+                    }}>
+                      <X size={15} /> Reject
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-line">
+                      <button onClick={() => copy(m.apiKey, 'key' + m.id)} className="flex items-center gap-1.5 text-[11.5px] font-mono text-muted max-w-[46%] truncate">
+                        <KeyRound size={12} /> {m.apiKey.slice(0, 12)}…
+                      </button>
+                      <button onClick={() => { setTestAmt('100'); setTestRef('TEST-' + Date.now().toString().slice(-6)); setTestNote('Test purchase'); setTestOpen(m) }} className="flex items-center gap-1 text-[11.5px] font-bold text-accent bg-accent/12 px-2.5 py-1.5 rounded-lg">
+                        <PlayCircle size={13} /> Test pay
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-[12px] text-muted flex items-center gap-1">
+                        <ReceiptText size={12} /> Unsettled <span className="font-bold text-text">{inr(m.settlement)}</span>
+                      </span>
+                      <button
+                        onClick={async () => {
+                          const res = await gatewaySettle(m.id)
+                          toast(res.ok ? `Settled ${inr(res.amount!)} (${res.ordersSetled ?? 0} orders)` : res.error || 'Failed', res.ok ? 'success' : 'error')
+                        }}
+                        disabled={m.settlement <= 0}
+                        className="flex items-center gap-1 text-[11.5px] font-bold text-primary bg-primary/12 px-2.5 py-1.5 rounded-lg disabled:opacity-40"
+                      >
+                        <ArrowDownToLine size={13} /> Settle
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )
           })}
@@ -401,16 +424,35 @@ export default function Gateway() {
           const mFees = mOrders.filter((o) => o.status === 'paid' || o.status === 'refunded').reduce((a, o) => a + o.fee, 0)
           const mSettlements = settlements.filter((s) => s.merchantId === m.id).sort((a, b) => b.settledAt - a.settledAt)
           const mEvents = events.filter((e) => e.merchantId === m.id && e.orderId === null).sort((a, b) => a.createdAt - b.createdAt)
+          const owner = users.find((u) => u.id === m.userId)
+          const pending = m.status === 'pending'
           return (
             <div className="pt-2 flex flex-col gap-4 pb-2">
               <div className="flex flex-col items-center text-center gap-1">
-                <span className={`w-12 h-12 rounded-2xl flex items-center justify-center ${m.status === 'active' ? 'bg-accent/12 text-accent' : 'bg-danger/12 text-danger'}`}>
+                <span className={`w-12 h-12 rounded-2xl flex items-center justify-center ${m.status === 'active' ? 'bg-accent/12 text-accent' : m.status === 'pending' ? 'bg-warning/12 text-warning' : 'bg-danger/12 text-danger'}`}>
                   <Store size={22} />
                 </span>
                 <p className="text-[16px] font-bold text-text">{m.name}</p>
                 <p className="text-[12px] text-muted">{m.appName}</p>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${m.status === 'active' ? 'bg-success/12 text-success' : 'bg-danger/12 text-danger'}`}>{m.status}</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${m.status === 'active' ? 'bg-success/12 text-success' : m.status === 'pending' ? 'bg-warning/12 text-warning' : 'bg-danger/12 text-danger'}`}>{m.status}</span>
               </div>
+
+              {pending && (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button full onClick={async () => {
+                    const res = await merchantReview(m.id, 'approve')
+                    toast(res.ok ? 'Gateway approved' : res.error || 'Failed', res.ok ? 'success' : 'error')
+                  }}>
+                    <CheckCircle2 size={15} /> Approve
+                  </Button>
+                  <Button variant="danger" full onClick={async () => {
+                    const res = await merchantReview(m.id, 'reject')
+                    toast(res.ok ? 'Gateway rejected' : res.error || 'Failed', res.ok ? 'success' : 'error')
+                  }}>
+                    <X size={15} /> Reject
+                  </Button>
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-2">
                 <div className="card p-3 text-center"><p className="text-[10px] text-muted uppercase">Orders</p><p className="text-[15px] font-bold text-text">{mOrders.length}</p></div>
@@ -419,6 +461,7 @@ export default function Gateway() {
               </div>
 
               <div className="card p-3.5 space-y-0">
+                {owner && <DetailRow label="Owner" value={`${owner.name} (${owner.upiId})`} />}
                 <DetailRow label="API key" value={m.apiKey} mono />
                 <DetailRow label="API secret" value={'•'.repeat(10) + m.apiSecret.slice(-4)} mono />
                 <DetailRow label="Callback" value={m.callbackUrl || 'Polling mode'} />

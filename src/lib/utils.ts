@@ -145,3 +145,29 @@ export const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   a.click()
   URL.revokeObjectURL(url)
 }
+
+export async function copyText(v: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(v)
+      return true
+    }
+  } catch {
+    /* fall back below */
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = v
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.focus()
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
