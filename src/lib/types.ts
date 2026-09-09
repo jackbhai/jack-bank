@@ -68,7 +68,7 @@ export type TxnType =
   | 'emi' | 'card_spend' | 'card_payment' | 'loan_disbursal'
   | 'adjustment' | 'interest' | 'welcome' | 'fd_open' | 'fd_break'
   | 'mf_buy' | 'mf_redeem' | 'stock_buy' | 'stock_sell' | 'gateway_pay'
-  | 'gateway_refund' | 'skin_buy'
+  | 'gateway_refund' | 'gateway_settlement' | 'skin_buy'
 
 export interface Transaction {
   id: string
