@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import { Home, QrCode, CreditCard, ReceiptText, LayoutGrid } from 'lucide-react'
 import { BottomNav } from './ui'
 import Sidebar from './Sidebar'
+import VerificationPopup from './VerificationPopup'
 
 const items = [
   { to: '/', icon: Home, label: 'Home' },
@@ -17,6 +18,7 @@ export default function Layout() {
       <Outlet />
       <BottomNav items={items} />
       <Sidebar />
+      <VerificationPopup />
     </div>
   )
 }

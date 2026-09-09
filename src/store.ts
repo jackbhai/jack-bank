@@ -164,6 +164,7 @@ const mapNotif = (n: any): Notif => ({
   body: n.body ?? '',
   read: n.read,
   createdAt: new Date(n.created_at).getTime(),
+  meta: n.meta ?? {},
 })
 
 const mapAnn = (a: any): Announcement => ({
@@ -418,6 +419,7 @@ interface BankState {
   addAnnouncement: (text: string) => Promise<Res>
   updateSettings: (patch: Partial<Settings>) => Promise<void>
   markNotifsRead: (userId: string) => Promise<void>
+  markNotifRead: (id: string) => Promise<void>
   resetBank: () => Promise<void>
 
   submitKyc: (userId: string, fields: { pan: string; dob: string; gender: string; occupation: string; incomeBand: string; address: string; city: string; state: string; pincode: string; nomineeName: string; nomineeRelation: string }) => Promise<Res>
@@ -1082,6 +1084,11 @@ export const useBank = create<BankState>()((set, get) => ({
 
   markNotifsRead: async (userId) => {
     await supabase.rpc('jb_mark_notifs_read', { p_user: userId })
+    get().refreshNotifs()
+  },
+
+  markNotifRead: async (id) => {
+    await supabase.rpc('jb_mark_notif_read', { p_notif: id })
     get().refreshNotifs()
   },
 

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Store, ShieldCheck, CheckCircle2, Loader2, Lock, Sun, Moon, Smartphone, CreditCard as CreditCardIcon, Landmark, RefreshCw, KeyRound, Copy, Check, X } from 'lucide-react'
+import { Store, ShieldCheck, CheckCircle2, Loader2, Lock, Sun, Moon, Smartphone, CreditCard as CreditCardIcon, Landmark, RefreshCw, KeyRound, Bell } from 'lucide-react'
 import { useBank, useToast, useTheme } from '../../store'
 import { inrFull, fmtDateTime } from '../../lib/utils'
 import { BankLogo } from '../../components/Cards'
-import { Button, Sheet, Modal, PinPad, Segmented, Field, inputCls } from '../../components/ui'
+import { Button, Sheet, PinPad, Segmented, Field, inputCls } from '../../components/ui'
 import { PaySourceSelector, type PaySource } from '../../components/Pay'
 import { fxCoin } from '../../lib/fx'
 
@@ -21,7 +21,6 @@ export default function GatewayPay() {
   const gatewayPay = useBank((s) => s.gatewayPay)
   const gatewayInitiate = useBank((s) => s.gatewayInitiate)
   const gatewayConfirm = useBank((s) => s.gatewayConfirm)
-  const gatewayOtpApprove = useBank((s) => s.gatewayOtpApprove)
   const theme = useTheme((s) => s.theme)
   const setTheme = useTheme((s) => s.setTheme)
 
@@ -46,12 +45,6 @@ export default function GatewayPay() {
   const [otpBusy, setOtpBusy] = useState(false)
   const [expiresIn, setExpiresIn] = useState(0)
   const [resendKey, setResendKey] = useState(0)
-  // approval popup
-  const [otpPopup, setOtpPopup] = useState(false)
-  const [approved, setApproved] = useState(false)
-  const [revealedOtp, setRevealedOtp] = useState('')
-  const [approving, setApproving] = useState(false)
-  const [copiedOtp, setCopiedOtp] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const me = session ? users.find((u) => u.id === session.userId) : undefined
@@ -76,9 +69,6 @@ export default function GatewayPay() {
     setOtp('')
     setOtpTo('')
     setExpiresIn(0)
-    setOtpPopup(false)
-    setApproved(false)
-    setRevealedOtp('')
     gatewayGetOrder(token).then((r) => {
       setLoading(false)
       if (r.ok) setOrder(r.order)
@@ -105,50 +95,9 @@ export default function GatewayPay() {
       setOtpTo(res.to || '')
       setExpiresIn(res.expiresIn || 300)
       setResendKey((k) => k + 1)
-      setApproved(false)
-      setRevealedOtp('')
-      setCopiedOtp(false)
-      setOtpPopup(true)
-      toast(`OTP sent to ${res.to}`, 'success')
+      toast(`Verification request sent to ${res.to}`, 'success')
     } else {
       toast(res.error || 'Could not send OTP', 'error')
-    }
-  }
-
-  const approveOtp = async () => {
-    setApproving(true)
-    const res = await gatewayOtpApprove(token!)
-    setApproving(false)
-    if (res.ok) {
-      setApproved(true)
-      setRevealedOtp(res.otp || '')
-      setOtp(res.otp || '')
-      setExpiresIn(res.expiresIn || expiresIn)
-      setOtpTo(res.to || otpTo)
-    } else {
-      setOtpPopup(false)
-      setOtpStage('idle')
-      toast(res.error || 'Approval failed', 'error')
-    }
-  }
-
-  const declineOtp = () => {
-    setOtpPopup(false)
-    setOtpStage('idle')
-    setOtp('')
-    setOtpTo('')
-    setExpiresIn(0)
-    toast('Payment request declined', 'info')
-  }
-
-  const copyOtp = async () => {
-    try {
-      await navigator.clipboard.writeText(revealedOtp)
-      setCopiedOtp(true)
-      setTimeout(() => setCopiedOtp(false), 1500)
-      toast('OTP copied', 'success')
-    } catch {
-      toast('Could not copy', 'error')
     }
   }
 
@@ -307,7 +256,10 @@ export default function GatewayPay() {
                 {otpStage === 'sent' && (
                   <>
                     <p className="text-[12px] text-success flex items-center gap-1.5">
-                      <KeyRound size={13} /> OTP sent to {otpTo}
+                      <Bell size={13} /> Verification request sent to {otpTo}
+                    </p>
+                    <p className="text-[11.5px] text-muted">
+                      Approve it in the account owner's Jack Bank app to reveal the OTP, then enter it here.
                     </p>
                     <input
                       value={otp}
@@ -356,7 +308,10 @@ export default function GatewayPay() {
                 {otpStage === 'sent' && (
                   <>
                     <p className="text-[12px] text-success flex items-center gap-1.5">
-                      <KeyRound size={13} /> OTP sent to {otpTo}
+                      <Bell size={13} /> Verification request sent to {otpTo}
+                    </p>
+                    <p className="text-[11.5px] text-muted">
+                      Approve it in the account owner's Jack Bank app to reveal the OTP, then enter it here.
                     </p>
                     <input
                       value={otp}
@@ -407,50 +362,6 @@ export default function GatewayPay() {
         </div>
         <PinPad onComplete={confirmPin} />
       </Sheet>
-
-      {/* OTP approval popup */}
-      <Modal open={otpPopup} onClose={() => {}}>
-        {!approved ? (
-          <div className="flex flex-col items-center text-center gap-3">
-            <span className="w-14 h-14 rounded-2xl bg-primary/12 text-primary flex items-center justify-center">
-              <ShieldCheck size={28} />
-            </span>
-            <p className="text-[16px] font-bold text-text">Approve this payment?</p>
-            <p className="text-[13px] text-muted">Verify it's you to reveal the one-time password for</p>
-            <p className="text-[24px] font-bold text-text">{inrFull(order.amount)}</p>
-            <p className="text-[13px] text-muted -mt-1.5">to {order.merchant_name}</p>
-            <div className="w-full rounded-xl bg-surface2 border border-line px-3 py-2.5 flex items-center justify-between text-[12.5px]">
-              <span className="text-muted flex items-center gap-1.5"><KeyRound size={13} /> OTP sent to</span>
-              <span className="font-semibold text-text">{otpTo}</span>
-            </div>
-            <div className="w-full grid grid-cols-2 gap-2 mt-1">
-              <Button variant="ghost" full onClick={declineOtp}>
-                <X size={16} /> Decline
-              </Button>
-              <Button full onClick={approveOtp} disabled={approving}>
-                {approving ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />} Approve
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center text-center gap-3">
-            <span className="w-14 h-14 rounded-2xl bg-success/12 text-success flex items-center justify-center">
-              <KeyRound size={26} />
-            </span>
-            <p className="text-[11px] font-bold text-muted uppercase tracking-wide">Your one-time password</p>
-            <p className="font-mono text-[36px] font-bold tracking-[0.3em] text-text leading-none">{revealedOtp}</p>
-            <p className="text-[12.5px] text-muted">
-              Valid {Math.floor(expiresIn / 60)}:{String(expiresIn % 60).padStart(2, '0')} · filled in below automatically
-            </p>
-            <div className="w-full grid grid-cols-2 gap-2">
-              <Button variant="ghost" full onClick={copyOtp}>
-                {copiedOtp ? <Check size={16} className="text-success" /> : <Copy size={16} />} {copiedOtp ? 'Copied' : 'Copy'}
-              </Button>
-              <Button full onClick={() => setOtpPopup(false)}>Done</Button>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   )
 }

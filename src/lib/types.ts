@@ -129,6 +129,7 @@ export interface Notif {
   body: string
   read: boolean
   createdAt: number
+  meta?: Record<string, any>
 }
 
 export interface Settings {
