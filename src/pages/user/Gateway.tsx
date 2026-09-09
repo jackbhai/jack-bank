@@ -253,6 +253,19 @@ Body: { p_api_key, p_api_secret, p_order_ref,
 Body: { p_api_key, p_api_secret, p_order_ref }
 → returns status: paid / pending / refunded`}
           </pre>
+          <pre className="card p-3.5 text-[11.5px] font-mono text-text bg-surface2 overflow-x-auto whitespace-pre-wrap">
+{`POST /rest/v1/rpc/jb_gateway_payout
+Body: { p_api_key, p_api_secret, p_order_ref,
+        p_amount, p_idempotency_key, p_note }
+→ pays winnings from your unsettled balance
+  into that order payer's wallet. Same key =
+  same result (never double-pays)`}
+          </pre>
+          <pre className="card p-3.5 text-[11.5px] font-mono text-text bg-surface2 overflow-x-auto whitespace-pre-wrap">
+{`POST /rest/v1/rpc/jb_gateway_payout_status
+Body: { p_api_key, p_api_secret, p_idempotency_key }
+→ safe to poll after a timeout`}
+          </pre>
           <Button variant="ghost" full onClick={() => setDocs(false)}>Close</Button>
         </div>
       </Sheet>
